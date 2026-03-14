@@ -53,6 +53,7 @@ export async function listThreads(): Promise<ThreadListItem[]> {
         agents: data.agents,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
+        archived: data.archived,
         lastMessagePreview: lastMsg?.content?.slice(0, 100) ?? "",
         messageCount: messages.length,
       });
@@ -141,6 +142,17 @@ export async function updateThreadTitle(threadId: string, title: string): Promis
     const thread = await getThread(threadId);
     if (!thread) return null;
     thread.title = title;
+    thread.updatedAt = new Date().toISOString();
+    await writeFile(getThreadPath(threadId), JSON.stringify(thread, null, 2));
+    return thread;
+  });
+}
+
+export async function archiveThread(threadId: string, archived: boolean): Promise<ThreadWithMessages | null> {
+  return withLock(threadId, async () => {
+    const thread = await getThread(threadId);
+    if (!thread) return null;
+    thread.archived = archived;
     thread.updatedAt = new Date().toISOString();
     await writeFile(getThreadPath(threadId), JSON.stringify(thread, null, 2));
     return thread;

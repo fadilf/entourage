@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getThread, deleteThread, updateThreadTitle } from "@/lib/thread-store";
+import { getThread, deleteThread, updateThreadTitle, archiveThread } from "@/lib/thread-store";
 import { getProcessManager } from "@/lib/process-manager";
 
 export async function GET(
@@ -19,11 +19,20 @@ export async function PATCH(
   { params }: { params: Promise<{ threadId: string }> }
 ) {
   const { threadId } = await params;
-  const { title } = await request.json();
-  if (!title || typeof title !== "string") {
+  const body = await request.json();
+
+  if (typeof body.archived === "boolean") {
+    const thread = await archiveThread(threadId, body.archived);
+    if (!thread) {
+      return NextResponse.json({ error: "Thread not found" }, { status: 404 });
+    }
+    return NextResponse.json(thread);
+  }
+
+  if (!body.title || typeof body.title !== "string") {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
   }
-  const thread = await updateThreadTitle(threadId, title.trim());
+  const thread = await updateThreadTitle(threadId, body.title.trim());
   if (!thread) {
     return NextResponse.json({ error: "Thread not found" }, { status: 404 });
   }

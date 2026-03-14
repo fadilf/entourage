@@ -5,6 +5,7 @@ import { createStreamParser } from "@/lib/stream-parser";
 import { AgentModel } from "@/lib/types";
 import { getWorkingDirectory } from "@/lib/thread-store";
 import { loadAgents } from "@/lib/agent-store";
+import { buildContextualPrompt } from "@/lib/context";
 
 export async function POST(
   request: Request,
@@ -84,6 +85,8 @@ export async function POST(
     (m) => m.role === "assistant" && m.agentId === agent.id && m.status === "complete"
   );
 
+  const enrichedPrompt = buildContextualPrompt(thread.messages, agent.id, thread.agents, prompt);
+
   let accumulatedContent = "";
   let lastPersist = Date.now();
   const parser = createStreamParser(agent.model as AgentModel);
@@ -98,7 +101,7 @@ export async function POST(
           threadId,
           agent.id,
           agent.model as AgentModel,
-          prompt,
+          enrichedPrompt,
           cwd,
           // onData
           (chunk: string) => {

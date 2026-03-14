@@ -73,7 +73,7 @@ export default function NewThreadDialog({
 
         <div className="mt-4">
           <label className="text-sm font-medium text-zinc-700">Agents</label>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {agents.map((agent) => {
               const selected = selectedAgentIds.includes(agent.id);
               return (

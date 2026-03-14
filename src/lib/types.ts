@@ -20,6 +20,7 @@ export type Thread = {
   agents: Agent[];
   createdAt: string;
   updatedAt: string;
+  archived?: boolean;
 };
 
 export type Message = {

@@ -84,6 +84,10 @@ export default function SettingsDialog({
       setError("Name is required");
       return;
     }
+    if (!/^[a-zA-Z0-9]+$/.test(form.name.trim())) {
+      setError("Name must contain only letters and numbers (no spaces or special characters)");
+      return;
+    }
     setSaving(true);
     setError("");
 
@@ -178,7 +182,7 @@ export default function SettingsDialog({
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Code Reviewer"
+                  placeholder="e.g. Joker"
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
                   autoFocus
                 />

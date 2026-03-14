@@ -43,6 +43,12 @@ export async function saveAgents(agents: Agent[]): Promise<void> {
   });
 }
 
+function validateAgentName(name: string): void {
+  if (!/^[a-zA-Z0-9]+$/.test(name)) {
+    throw new Error("Agent name must contain only letters and numbers (no spaces or special characters)");
+  }
+}
+
 export async function createAgent(data: {
   name: string;
   model: Agent["model"];
@@ -50,6 +56,7 @@ export async function createAgent(data: {
   icon?: Agent["icon"];
   personality?: string;
 }): Promise<Agent> {
+  validateAgentName(data.name);
   const agents = await loadAgents();
 
   if (agents.some((a) => a.name.toLowerCase() === data.name.toLowerCase())) {
@@ -76,9 +83,12 @@ export async function updateAgent(id: string, updates: Partial<Omit<Agent, "id" 
   const idx = agents.findIndex((a) => a.id === id);
   if (idx === -1) throw new Error("Agent not found");
 
-  if (updates.name && updates.name !== agents[idx].name) {
-    if (agents.some((a) => a.id !== id && a.name.toLowerCase() === updates.name!.toLowerCase())) {
-      throw new Error(`Agent name "${updates.name}" is already taken`);
+  if (updates.name) {
+    validateAgentName(updates.name);
+    if (updates.name !== agents[idx].name) {
+      if (agents.some((a) => a.id !== id && a.name.toLowerCase() === updates.name!.toLowerCase())) {
+        throw new Error(`Agent name "${updates.name}" is already taken`);
+      }
     }
   }
 

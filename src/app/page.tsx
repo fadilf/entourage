@@ -120,6 +120,22 @@ export default function Home() {
     [selectedThreadId, setSelectedThread, refetchThreads]
   );
 
+  const handleArchiveThread = useCallback(
+    async (threadId: string, archived: boolean) => {
+      const res = await fetch(`/api/threads/${threadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived }),
+      });
+      if (!res.ok) return;
+      refetchThreads();
+      if (archived && selectedThreadId === threadId) {
+        setSelectedThreadId(null);
+      }
+    },
+    [refetchThreads, selectedThreadId]
+  );
+
   const handleThreadCreated = useCallback(
     (thread: ThreadWithMessages) => {
       refetchThreads();
@@ -136,6 +152,7 @@ export default function Home() {
         onSelectThread={setSelectedThreadId}
         onNewThread={() => setShowNewThread(true)}
         onOpenSettings={() => setShowSettings(true)}
+        onArchiveThread={handleArchiveThread}
         statuses={statuses}
       />
       <ThreadDetail
