@@ -29,20 +29,17 @@ export const DEFAULT_AGENTS: Agent[] = [
 ];
 
 export function getCliCommand(model: string, prompt: string, sessionId: string, isResume: boolean, personality?: string, imagePaths?: string[]): { cmd: string; args: string[] } {
-  // Prepend image file paths to the prompt so the CLI can pick them up
+  const hasImages = imagePaths && imagePaths.length > 0;
+
+  // Build prompt with image instructions
   let fullPrompt = prompt;
-  if (imagePaths && imagePaths.length > 0) {
-    const imageRefs = imagePaths.map((p) => `[Image: ${p}]`).join("\n");
-    fullPrompt = `${imageRefs}\n\n${prompt}`;
+  if (hasImages) {
+    const imageList = imagePaths.map((p) => p).join("\n");
+    fullPrompt = `IMPORTANT: The user has attached image(s) to this message. You MUST use the Read tool to view each image file BEFORE responding. Image paths:\n${imageList}\n\nUser message: ${prompt}`;
   }
 
   if (model === "claude") {
     const args = ["-p", fullPrompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions"];
-    if (imagePaths && imagePaths.length > 0) {
-      for (const p of imagePaths) {
-        args.push("--file", p);
-      }
-    }
     if (isResume) {
       args.push("--resume", sessionId);
     } else {
