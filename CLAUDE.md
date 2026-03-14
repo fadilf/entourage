@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Commands
 
 - `npm run dev` — Start dev server (Next.js, port 3000)
@@ -12,23 +10,36 @@ No test framework is configured.
 
 ## Architecture
 
-Nexus is a thread-based messaging UI where a human user communicates with AI agents (Claude, Gemini, Codex). Currently static/demo data — no backend.
+Nexus is a multi-agent coding tool that spawns CLI subprocesses (Claude CLI, Gemini CLI) against a local project directory, with a unified chat UI for real-time streaming conversations. Users can create custom agent profiles with distinct names, icons, colors, and personality system prompts.
 
-**Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4
+**Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, lucide-react icons
 
-**Path alias:** `@/*` maps to `./src/*`
+**Path alias:** `@/*` → `./src/*`
 
-### Key files
+### Data flow
 
-- `src/data/threads.ts` — Type definitions (`Thread`, `Message`, `User`, `AgentModel`) and static thread data. `ME` is the human user; agents have a `model` field.
-- `src/app/page.tsx` — Client component. Manages selected thread state, renders `ThreadList` + `ThreadDetail` side-by-side.
-- `src/components/ThreadList.tsx` — Sidebar showing threads with participant avatars, last message preview, message count.
-- `src/components/ThreadDetail.tsx` — Header with participant chips + scrollable message list. Uses `resolveUser()` to map `senderId` → `User`.
-- `src/components/MessageBubble.tsx` — Chat bubble. Own messages align right (violet), agent messages align left (zinc). Shows model icon for agents.
-- `src/components/ModelIcon.tsx` — Renders agent logo SVGs from `/public/agent-icons/`.
+```
+Browser → API Routes → ProcessManager (singleton) → CLI subprocesses (claude, gemini)
+                      → ThreadStore → .nexus/threads/*.json
+                      → AgentStore  → .nexus/config.json
+```
+
+### Key patterns
+
+- **File-based persistence** with per-thread write locks (`Map<string, Promise>`)
+- **ProcessManager** is a `globalThis` singleton (survives HMR), keyed by `${threadId}:${agentId}`
+- **Startup recovery:** `getThread()` marks stale `status: "streaming"` messages as `error`
+- **Agent personality:** Claude uses `--append-system-prompt`, Gemini prepends `[System Instructions]` to prompt
+- **SSE streaming** via POST fetch + ReadableStream reader (`useAgentStream` hook)
+- **@mentions** parsed to route messages to specific agents; falls back to first agent
 
 ### Design conventions
 
-- Dark theme: zinc-950 background, zinc-100 text, violet-600 for user's own messages
-- Agent avatars: white circle with colored border/inner shadow per agent, model SVG icon inside
+- Light theme: white bg, zinc-900 text, violet-600 for user messages
+- Agent avatars: white circle with colored border, model SVG or custom icon inside
 - Fonts: Geist Sans + Geist Mono via `next/font/google`
+- Modals: `fixed inset-0 z-50 bg-black/40` overlay
+
+### Environment
+
+- `NEXUS_PROJECT_DIR` — Working directory for CLI subprocesses (defaults to `process.cwd()`)

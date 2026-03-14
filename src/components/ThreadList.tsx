@@ -1,5 +1,7 @@
-import { Thread } from "@/data/threads";
+import { ThreadListItem, ThreadProcess } from "@/lib/types";
 import ModelIcon from "./ModelIcon";
+import AgentStatusBadge from "./AgentStatusBadge";
+import { Settings } from "lucide-react";
 
 function formatDate(timestamp: string) {
   const date = new Date(timestamp);
@@ -19,21 +21,40 @@ export default function ThreadList({
   threads,
   selectedThreadId,
   onSelectThread,
+  onNewThread,
+  onOpenSettings,
+  statuses,
 }: {
-  threads: Thread[];
+  threads: ThreadListItem[];
   selectedThreadId: string | null;
   onSelectThread: (id: string) => void;
+  onNewThread: () => void;
+  onOpenSettings: () => void;
+  statuses: ThreadProcess[];
 }) {
   return (
     <div className="flex h-full w-[35%] min-w-[280px] flex-col border-r border-zinc-200">
-      <div className="flex items-center gap-2 border-b border-zinc-200 px-5 py-4">
+      <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
         <h1 className="text-lg font-semibold text-zinc-900">Nexus</h1>
+        <button
+          onClick={onNewThread}
+          className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
+        >
+          + New
+        </button>
       </div>
       <div className="flex-1 overflow-y-auto">
+        {threads.length === 0 && (
+          <div className="px-5 py-8 text-center text-sm text-zinc-400">
+            No threads yet. Create one to get started.
+          </div>
+        )}
         {threads.map((thread) => {
-          const lastMessage = thread.messages[thread.messages.length - 1];
           const isSelected = thread.id === selectedThreadId;
-          const firstParticipant = thread.participants[0];
+          const firstAgent = thread.agents[0];
+          const threadStatuses = statuses.filter((s) => s.threadId === thread.id);
+          const hasRunning = threadStatuses.some((s) => s.status === "running");
+          const hasError = threadStatuses.some((s) => s.status === "error");
 
           return (
             <button
@@ -45,36 +66,52 @@ export default function ThreadList({
             >
               <div
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-100"
-                style={{ border: `1.5px solid ${firstParticipant.avatarColor}`, boxShadow: `inset 0 2px 6px ${firstParticipant.avatarColor}80` }}
+                style={firstAgent ? { border: `1.5px solid ${firstAgent.avatarColor}`, boxShadow: `inset 0 2px 6px ${firstAgent.avatarColor}80` } : undefined}
               >
-                {firstParticipant.model && (
-                  <ModelIcon model={firstParticipant.model} className="h-5 w-5" />
+                {firstAgent && (
+                  <ModelIcon model={firstAgent.model} icon={firstAgent.icon} className="h-5 w-5" />
                 )}
               </div>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <div className="flex items-baseline justify-between gap-2">
+                <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-medium text-zinc-900">
                     {thread.title}
                   </span>
-                  <span className="shrink-0 text-[11px] text-zinc-500">
-                    {formatDate(lastMessage.timestamp)}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {(hasRunning || hasError) && (
+                      <AgentStatusBadge status={hasRunning ? "running" : "error"} />
+                    )}
+                    <span className="text-[11px] text-zinc-500">
+                      {formatDate(thread.updatedAt)}
+                    </span>
+                  </div>
                 </div>
                 <span className="truncate text-xs text-zinc-500">
-                  {thread.participants.map((p) => p.name).join(", ")}
+                  {thread.agents.map((a) => a.name).join(", ")}
                 </span>
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-xs text-zinc-500">
-                    {lastMessage.content}
+                    {thread.lastMessagePreview}
                   </span>
-                  <span className="shrink-0 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] text-zinc-500">
-                    {thread.messages.length}
-                  </span>
+                  {thread.messageCount > 0 && (
+                    <span className="shrink-0 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] text-zinc-500">
+                      {thread.messageCount}
+                    </span>
+                  )}
                 </div>
               </div>
             </button>
           );
         })}
+      </div>
+      <div className="border-t border-zinc-200 px-5 py-3">
+        <button
+          onClick={onOpenSettings}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-100"
+        >
+          <Settings className="h-4 w-4" />
+          Settings
+        </button>
       </div>
     </div>
   );
