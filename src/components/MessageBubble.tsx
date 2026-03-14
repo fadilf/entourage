@@ -16,7 +16,7 @@ function renderContent(content: string, isOwn: boolean) {
       <span
         key={i}
         className={`font-medium ${
-          isOwn ? "text-violet-200" : "text-violet-400"
+          isOwn ? "text-violet-200" : "text-violet-600"
         }`}
       >
         {part}
@@ -63,7 +63,7 @@ export default function MessageBubble({
           <span className="mb-1 text-xs text-zinc-500">
             {senderName}
             {model && (
-              <span className="ml-1 text-zinc-600">· {model}</span>
+              <span className="ml-1 text-zinc-400">· {model}</span>
             )}
           </span>
         )}
@@ -71,12 +71,12 @@ export default function MessageBubble({
           className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
             isOwn
               ? "bg-violet-600 text-white"
-              : "bg-zinc-800 text-zinc-100"
+              : "bg-zinc-100 text-zinc-900"
           }`}
         >
           {renderContent(message.content, isOwn)}
         </div>
-        <span className="mt-1 text-[11px] text-zinc-600">
+        <span className="mt-1 text-[11px] text-zinc-400">
           {formatTime(message.timestamp)}
         </span>
       </div>

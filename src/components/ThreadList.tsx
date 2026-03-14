@@ -25,9 +25,9 @@ export default function ThreadList({
   onSelectThread: (id: string) => void;
 }) {
   return (
-    <div className="flex h-full w-[35%] min-w-[280px] flex-col border-r border-zinc-800">
-      <div className="flex items-center gap-2 border-b border-zinc-800 px-5 py-4">
-        <h1 className="text-lg font-semibold text-zinc-100">Nexus</h1>
+    <div className="flex h-full w-[35%] min-w-[280px] flex-col border-r border-zinc-200">
+      <div className="flex items-center gap-2 border-b border-zinc-200 px-5 py-4">
+        <h1 className="text-lg font-semibold text-zinc-900">Nexus</h1>
       </div>
       <div className="flex-1 overflow-y-auto">
         {threads.map((thread) => {
@@ -39,8 +39,8 @@ export default function ThreadList({
             <button
               key={thread.id}
               onClick={() => onSelectThread(thread.id)}
-              className={`flex w-full gap-3 px-5 py-3.5 text-left transition-colors hover:bg-zinc-800/40 ${
-                isSelected ? "bg-zinc-800/60" : ""
+              className={`flex w-full gap-3 px-5 py-3.5 text-left transition-colors hover:bg-zinc-100 ${
+                isSelected ? "bg-zinc-100" : "cursor-pointer"
               }`}
             >
               <div
@@ -53,7 +53,7 @@ export default function ThreadList({
               </div>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-sm font-medium text-zinc-100">
+                  <span className="truncate text-sm font-medium text-zinc-900">
                     {thread.title}
                   </span>
                   <span className="shrink-0 text-[11px] text-zinc-500">
@@ -67,7 +67,7 @@ export default function ThreadList({
                   <span className="truncate text-xs text-zinc-500">
                     {lastMessage.content}
                   </span>
-                  <span className="shrink-0 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
+                  <span className="shrink-0 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] text-zinc-500">
                     {thread.messages.length}
                   </span>
                 </div>

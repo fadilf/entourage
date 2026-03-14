@@ -10,7 +10,7 @@ function resolveUser(senderId: string, thread: Thread): User {
 export default function ThreadDetail({ thread }: { thread: Thread | null }) {
   if (!thread) {
     return (
-      <div className="flex flex-1 items-center justify-center text-zinc-600">
+      <div className="flex flex-1 items-center justify-center text-zinc-400">
         Select a thread to view
       </div>
     );
@@ -18,13 +18,13 @@ export default function ThreadDetail({ thread }: { thread: Thread | null }) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="border-b border-zinc-800 px-6 py-4">
-        <h2 className="text-sm font-medium text-zinc-100">{thread.title}</h2>
+      <div className="border-b border-zinc-200 px-6 py-4">
+        <h2 className="text-sm font-medium text-zinc-900">{thread.title}</h2>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {thread.participants.map((p) => (
             <span
               key={p.id}
-              className="inline-flex items-center gap-1.5 rounded-full bg-zinc-800 px-2.5 py-1 text-xs"
+              className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 text-xs"
             >
               {p.model && (
                 <span
@@ -34,7 +34,7 @@ export default function ThreadDetail({ thread }: { thread: Thread | null }) {
                   <ModelIcon model={p.model} className="h-2.5 w-2.5" />
                 </span>
               )}
-              <span className="text-zinc-300">{p.name}</span>
+              <span className="text-zinc-700">{p.name}</span>
               {p.model && (
                 <span className="text-zinc-500">· {p.model}</span>
               )}
