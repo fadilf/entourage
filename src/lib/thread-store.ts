@@ -2,6 +2,7 @@ import { readdir, readFile, writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { NEXUS_DIR, THREADS_DIR } from "./config";
 import { Thread, Message, ThreadWithMessages, ThreadListItem, Agent } from "./types";
+import { getProcessManager } from "./process-manager";
 
 function getWorkingDirectory(): string {
   return process.env.NEXUS_PROJECT_DIR || process.cwd();
@@ -54,6 +55,7 @@ export async function listThreads(workspaceDir: string): Promise<ThreadListItem[
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
         archived: data.archived,
+        unreadAgents: data.unreadAgents || [],
         lastMessagePreview: lastMsg?.content?.slice(0, 100) ?? "",
         messageCount: messages.length,
       });
@@ -69,23 +71,84 @@ export async function listThreads(workspaceDir: string): Promise<ThreadListItem[
 export async function getThread(workspaceDir: string, id: string): Promise<ThreadWithMessages | null> {
   try {
     const raw = await readFile(getThreadPath(workspaceDir, id), "utf-8");
-    const data = JSON.parse(raw) as ThreadWithMessages;
-    // Recovery: mark any streaming messages as error
-    let modified = false;
-    for (const msg of data.messages) {
-      if (msg.status === "streaming") {
-        msg.status = "error";
-        msg.content += "\n\n[Stream interrupted]";
-        modified = true;
-      }
-    }
-    if (modified) {
-      await writeFile(getThreadPath(workspaceDir, id), JSON.stringify(data, null, 2));
-    }
-    return data;
+    return JSON.parse(raw) as ThreadWithMessages;
   } catch {
     return null;
   }
+}
+
+export async function recoverStaleStreams(workspaceDir: string): Promise<void> {
+  const threadsDir = getThreadsDir(workspaceDir);
+  let files: string[];
+  try {
+    files = await readdir(threadsDir);
+  } catch {
+    return;
+  }
+
+  const pm = getProcessManager();
+
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue;
+    const threadId = file.replace(".json", "");
+
+    await withLock(threadId, async () => {
+      const threadPath = getThreadPath(workspaceDir, threadId);
+      const raw = await readFile(threadPath, "utf-8");
+      const thread = JSON.parse(raw) as ThreadWithMessages;
+
+      let modified = false;
+      for (const msg of thread.messages) {
+        if (msg.status === "streaming") {
+          const agentId = msg.agentId || "";
+          const existing = pm.getProcess(threadId, agentId);
+          if (!existing) {
+            msg.status = "error";
+            msg.content += "\n\n[Stream interrupted]";
+            modified = true;
+          }
+        }
+      }
+
+      if (modified) {
+        await writeFile(threadPath, JSON.stringify(thread, null, 2));
+      }
+    });
+  }
+}
+
+export async function addUnreadAgent(
+  workspaceDir: string,
+  threadId: string,
+  agentId: string
+): Promise<void> {
+  await withLock(threadId, async () => {
+    const threadPath = getThreadPath(workspaceDir, threadId);
+    const raw = await readFile(threadPath, "utf-8");
+    const thread = JSON.parse(raw) as ThreadWithMessages;
+
+    const unreadAgents = thread.unreadAgents || [];
+    if (!unreadAgents.includes(agentId)) {
+      thread.unreadAgents = [...unreadAgents, agentId];
+      await writeFile(threadPath, JSON.stringify(thread, null, 2));
+    }
+  });
+}
+
+export async function clearUnreadAgents(
+  workspaceDir: string,
+  threadId: string
+): Promise<void> {
+  await withLock(threadId, async () => {
+    const threadPath = getThreadPath(workspaceDir, threadId);
+    const raw = await readFile(threadPath, "utf-8");
+    const thread = JSON.parse(raw) as ThreadWithMessages;
+
+    if (thread.unreadAgents && thread.unreadAgents.length > 0) {
+      thread.unreadAgents = [];
+      await writeFile(threadPath, JSON.stringify(thread, null, 2));
+    }
+  });
 }
 
 export async function createThread(workspaceDir: string, title: string, agents: Thread["agents"]): Promise<ThreadWithMessages> {
