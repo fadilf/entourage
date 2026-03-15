@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getThread, deleteThread, updateThreadTitle, archiveThread } from "@/lib/thread-store";
+import { getThread, deleteThread, updateThreadTitle, archiveThread, clearUnreadAgents } from "@/lib/thread-store";
 import { getProcessManager } from "@/lib/process-manager";
 import { resolveWorkspaceDir } from "@/lib/workspace-context";
 
@@ -23,6 +23,11 @@ export async function PATCH(
   const workspaceDir = await resolveWorkspaceDir(request);
   const { threadId } = await params;
   const body = await request.json();
+
+  if (body.clearUnread === true) {
+    await clearUnreadAgents(workspaceDir, threadId);
+    return NextResponse.json({ success: true });
+  }
 
   if (typeof body.archived === "boolean") {
     const thread = await archiveThread(workspaceDir, threadId, body.archived);
