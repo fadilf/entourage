@@ -4,6 +4,7 @@ import { AgentModel, AgentIcon, Message } from "@/lib/types";
 import ModelIcon from "./ModelIcon";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { useWsParam } from "@/contexts/WorkspaceContext";
 
 function formatTime(timestamp: string) {
@@ -112,7 +113,7 @@ export default function MessageBubble({
           ) : (
             <div className="markdown-body">
               <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkGfm, remarkBreaks]}
                 components={{
                   h1: ({ children }) => <h1 className="text-base font-bold mt-3 mb-1 first:mt-0">{children}</h1>,
                   h2: ({ children }) => <h2 className="text-sm font-bold mt-3 mb-1 first:mt-0">{children}</h2>,
@@ -121,10 +122,10 @@ export default function MessageBubble({
                   ul: ({ children }) => <ul className="list-disc pl-4 mb-2 last:mb-0">{children}</ul>,
                   ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 last:mb-0">{children}</ol>,
                   li: ({ children }) => <li className="mb-0.5">{children}</li>,
-                  code: ({ className, children }) => {
-                    const isBlock = className?.includes("language-");
+                  code: ({ className, children, node }) => {
+                    const isBlock = className?.includes("language-") || node?.position?.start.line !== node?.position?.end.line || (typeof children === "string" && children.includes("\n"));
                     return isBlock ? (
-                      <code className={`block bg-zinc-800 text-zinc-100 rounded-lg p-3 my-2 text-xs font-mono overflow-x-auto whitespace-pre ${className}`}>
+                      <code className={`block bg-zinc-800 text-zinc-100 rounded-lg p-3 my-2 text-xs font-mono overflow-x-auto whitespace-pre ${className || ""}`}>
                         {children}
                       </code>
                     ) : (
