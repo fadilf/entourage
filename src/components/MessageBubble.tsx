@@ -39,6 +39,7 @@ export default function MessageBubble({
   avatarColor,
   model,
   icon,
+  isMobile,
 }: {
   message: Message;
   isOwn: boolean;
@@ -46,6 +47,7 @@ export default function MessageBubble({
   avatarColor?: string;
   model?: AgentModel;
   icon?: AgentIcon;
+  isMobile?: boolean;
 }) {
   const wsParam = useWsParam();
   const avatar = (
@@ -152,6 +154,9 @@ export default function MessageBubble({
                 {message.content || (isStreaming ? "" : "")}
               </ReactMarkdown>
             </div>
+          )}
+          {isStreaming && !message.content && (
+            <span className="text-xs text-zinc-400 italic">Reconnecting...</span>
           )}
           {isStreaming && (
             <span className="inline-flex ml-1">
