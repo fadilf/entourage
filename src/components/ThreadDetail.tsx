@@ -176,7 +176,6 @@ export default function ThreadDetail({
               avatarColor={agent?.avatarColor}
               model={agent?.model}
               icon={agent?.icon}
-              isMobile={isMobile}
             />
           );
         })}
