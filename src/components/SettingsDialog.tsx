@@ -144,9 +144,9 @@ export default function SettingsDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="flex w-full max-w-2xl flex-col rounded-xl bg-white shadow-xl" style={{ maxHeight: "85vh" }}>
+      <div className="flex w-full max-w-2xl flex-col rounded-xl bg-white shadow-xl mx-4" style={{ maxHeight: "85vh" }}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-4 md:px-6 py-4">
           <div className="flex items-center gap-3">
             {showForm && (
               <button onClick={cancelForm} className="text-zinc-500 hover:text-zinc-700">
@@ -170,7 +170,7 @@ export default function SettingsDialog({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
           {showForm ? (
             <div className="space-y-4">
               {error && (

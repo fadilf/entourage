@@ -52,7 +52,7 @@ export default function NewThreadDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+      <div className="w-full max-w-md rounded-xl bg-white p-4 md:p-6 shadow-xl mx-4">
         <h3 className="text-lg font-semibold text-zinc-900">New Thread</h3>
 
         <div className="mt-4">

@@ -347,7 +347,7 @@ export default function Home() {
 
   return (
     <WorkspaceProvider workspaceId={activeWorkspaceId}>
-    <div className="flex h-screen bg-white text-zinc-900">
+    <div className="flex h-screen overflow-hidden bg-white text-zinc-900">
       {isMobile ? (
         selectedThreadId ? threadDetailEl : threadListEl
       ) : (

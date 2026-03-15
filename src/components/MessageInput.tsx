@@ -16,12 +16,14 @@ export default function MessageInput({
   onSendMessage,
   onStop,
   disabled,
+  isMobile,
 }: {
   agents: Agent[];
   allAgents?: Agent[];
   onSendMessage: (content: string, images?: MessageImage[]) => void;
   onStop?: (agentId: string) => void;
   disabled?: boolean;
+  isMobile?: boolean;
 }) {
   const wsParam = useWsParam();
   const [content, setContent] = useState("");
@@ -183,7 +185,7 @@ export default function MessageInput({
 
   return (
     <div
-      className={`relative border-t border-zinc-200 px-6 py-4 ${isDragOver ? "bg-violet-50" : ""}`}
+      className={`relative border-t border-zinc-200 ${isMobile ? "px-4" : "px-6"} py-4 ${isDragOver ? "bg-violet-50" : ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -195,7 +197,7 @@ export default function MessageInput({
       )}
 
       {showMentions && filteredAgents.length > 0 && (
-        <div className="absolute bottom-full left-6 mb-1 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+        <div className={`absolute bottom-full ${isMobile ? "left-4 right-4" : "left-6"} mb-1 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg`}>
           {filteredAgents.map((agent) => (
             <button
               key={agent.id}

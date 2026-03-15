@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ThreadWithMessages, Agent, Message, MessageImage } from "@/lib/types";
+import { ChevronLeft, Pencil } from "lucide-react";
 import MessageBubble from "./MessageBubble";
 import ModelIcon from "./ModelIcon";
 import MessageInput from "./MessageInput";
@@ -19,6 +20,8 @@ export default function ThreadDetail({
   onRenameThread,
   isStreaming,
   allAgents,
+  isMobile,
+  onBack,
 }: {
   thread: ThreadWithMessages | null;
   streamingMessages: Map<string, { agentId: string; content: string }>;
@@ -27,6 +30,8 @@ export default function ThreadDetail({
   onRenameThread?: (title: string) => void;
   isStreaming: boolean;
   allAgents?: Agent[];
+  isMobile?: boolean;
+  onBack?: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
@@ -81,42 +86,66 @@ export default function ThreadDetail({
   const allMessages = [...thread.messages, ...streamingMsgs];
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="border-b border-zinc-200 px-6 py-4">
-        {isEditingTitle ? (
-          <input
-            ref={titleInputRef}
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            onBlur={() => {
-              const trimmed = editTitle.trim();
-              if (trimmed && trimmed !== thread.title) {
-                onRenameThread?.(trimmed);
-              }
-              setIsEditingTitle(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                (e.target as HTMLInputElement).blur();
-              } else if (e.key === "Escape") {
+    <div className="flex min-w-0 flex-1 flex-col">
+      <div className={`border-b border-zinc-200 ${isMobile ? "px-4" : "px-6"} py-4`}>
+        <div className="flex items-center gap-2">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="shrink-0 -ml-1 rounded-lg p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          )}
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={() => {
+                const trimmed = editTitle.trim();
+                if (trimmed && trimmed !== thread.title) {
+                  onRenameThread?.(trimmed);
+                }
                 setIsEditingTitle(false);
-              }
-            }}
-            className="w-full rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-sm font-medium text-zinc-900 outline-none focus:border-zinc-500"
-          />
-        ) : (
-          <h2
-            className="cursor-pointer text-sm font-medium text-zinc-900 hover:text-zinc-600"
-            onDoubleClick={() => {
-              setEditTitle(thread.title);
-              setIsEditingTitle(true);
-              setTimeout(() => titleInputRef.current?.select(), 0);
-            }}
-            title="Double-click to rename"
-          >
-            {thread.title}
-          </h2>
-        )}
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  (e.target as HTMLInputElement).blur();
+                } else if (e.key === "Escape") {
+                  setIsEditingTitle(false);
+                }
+              }}
+              className="w-full rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-sm font-medium text-zinc-900 outline-none focus:border-zinc-500"
+            />
+          ) : (
+            <>
+              <h2
+                className={`text-sm font-medium text-zinc-900 ${isMobile ? "truncate" : "cursor-pointer hover:text-zinc-600"}`}
+                onDoubleClick={isMobile ? undefined : () => {
+                  setEditTitle(thread.title);
+                  setIsEditingTitle(true);
+                  setTimeout(() => titleInputRef.current?.select(), 0);
+                }}
+                title={isMobile ? undefined : "Double-click to rename"}
+              >
+                {thread.title}
+              </h2>
+              {isMobile && (
+                <button
+                  onClick={() => {
+                    setEditTitle(thread.title);
+                    setIsEditingTitle(true);
+                    setTimeout(() => titleInputRef.current?.select(), 0);
+                  }}
+                  className="shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </>
+          )}
+        </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {thread.agents.map((agent) => (
             <span
@@ -135,7 +164,7 @@ export default function ThreadDetail({
           ))}
         </div>
       </div>
-      <div ref={scrollRef} className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+      <div ref={scrollRef} className={`flex flex-1 flex-col gap-4 overflow-y-auto ${isMobile ? "px-4" : "px-6"} py-5`}>
         {allMessages.map((message) => {
           const agent = resolveAgent(message, thread.agents);
           return (
@@ -147,6 +176,7 @@ export default function ThreadDetail({
               avatarColor={agent?.avatarColor}
               model={agent?.model}
               icon={agent?.icon}
+              isMobile={isMobile}
             />
           );
         })}
@@ -158,6 +188,7 @@ export default function ThreadDetail({
         onSendMessage={onSendMessage}
         onStop={onStop}
         disabled={isStreaming}
+        isMobile={isMobile}
       />
     </div>
   );

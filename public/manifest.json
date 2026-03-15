@@ -1,0 +1,17 @@
+{
+  "name": "Nexus",
+  "short_name": "Nexus",
+  "description": "Thread-based messaging client",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

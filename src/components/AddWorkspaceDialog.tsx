@@ -65,7 +65,7 @@ export default function AddWorkspaceDialog({ open, onClose, onAdded }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-4 md:p-6 mx-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-zinc-900">Add Workspace</h2>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">

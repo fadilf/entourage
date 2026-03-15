@@ -79,7 +79,7 @@ export default function IconPicker({
             placeholder="Search icons..."
             className="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
           />
-          <div className="grid max-h-[160px] grid-cols-8 gap-1 overflow-y-auto rounded-lg border border-zinc-200 p-2">
+          <div className="grid max-h-[160px] grid-cols-6 md:grid-cols-8 gap-1 overflow-y-auto rounded-lg border border-zinc-200 p-2">
             {filtered.map((name) => {
               const Icon = ICON_MAP[name];
               const isSelected = value?.type === "lucide" && value.name === name;
@@ -100,7 +100,7 @@ export default function IconPicker({
               );
             })}
             {filtered.length === 0 && (
-              <div className="col-span-8 py-3 text-center text-xs text-zinc-400">No icons found</div>
+              <div className="col-span-6 md:col-span-8 py-3 text-center text-xs text-zinc-400">No icons found</div>
             )}
           </div>
         </>
