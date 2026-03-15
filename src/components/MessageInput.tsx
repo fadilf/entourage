@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { Paperclip, X } from "lucide-react";
+import { Paperclip, X, Mic, Square } from "lucide-react";
+import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { Agent, MessageImage } from "@/lib/types";
 import { useWsParam } from "@/contexts/WorkspaceContext";
 
@@ -34,6 +35,12 @@ export default function MessageInput({
   const [isDragOver, setIsDragOver] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { isListening, interimText, isSupported, permissionDenied, toggle, stopListening: stopVoice } = useVoiceInput(
+    useCallback((text: string) => {
+      setContent((prev) => prev + text);
+    }, [])
+  );
 
   const autocompleteAgents = allAgents ?? agents;
   const threadAgentIds = new Set(agents.map((a) => a.id));
@@ -142,10 +149,14 @@ export default function MessageInput({
         handleSend();
       }
       if (e.key === "Escape") {
-        setShowMentions(false);
+        if (isListening) {
+          stopVoice();
+        } else {
+          setShowMentions(false);
+        }
       }
     },
-    [handleSend]
+    [handleSend, isListening, stopVoice]
   );
 
   const handlePaste = useCallback(
@@ -267,23 +278,54 @@ export default function MessageInput({
           <Paperclip className="h-5 w-5" />
         </button>
 
-        <textarea
-          ref={textareaRef}
-          value={content}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          placeholder={`Message ${agents.map((a) => a.name).join(", ")}... (@ to mention)`}
-          disabled={disabled}
-          rows={1}
-          className="flex-1 resize-none rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
-          style={{ maxHeight: "120px" }}
-          onInput={(e) => {
-            const el = e.target as HTMLTextAreaElement;
-            el.style.height = "auto";
-            el.style.height = Math.min(el.scrollHeight, 120) + "px";
-          }}
-        />
+        <div className="relative flex-1">
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder={`Message ${agents.map((a) => a.name).join(", ")}... (@ to mention)`}
+            disabled={disabled}
+            rows={1}
+            className={`w-full resize-none rounded-lg border bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none disabled:opacity-50 ${
+              isListening
+                ? "border-violet-500 ring-1 ring-violet-500"
+                : "border-zinc-200 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            }`}
+            style={{
+              maxHeight: "120px",
+              paddingRight: isSupported ? "2.5rem" : undefined,
+              ...(isListening ? { boxShadow: "0 0 12px rgba(124, 58, 237, 0.3)" } : {}),
+            }}
+            onInput={(e) => {
+              const el = e.target as HTMLTextAreaElement;
+              el.style.height = "auto";
+              el.style.height = Math.min(el.scrollHeight, 120) + "px";
+            }}
+          />
+          {isSupported && (
+            <button
+              type="button"
+              onClick={toggle}
+              disabled={disabled}
+              className={`absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                permissionDenied
+                  ? "bg-red-500 text-white"
+                  : isListening
+                    ? "animate-pulse bg-red-500 text-white"
+                    : "bg-zinc-100 text-zinc-400 hover:border-violet-500 hover:text-violet-500 border border-transparent"
+              } disabled:opacity-50`}
+              title={isListening ? "Stop voice input" : "Start voice input"}
+            >
+              {isListening ? (
+                <Square className="h-3 w-3" />
+              ) : (
+                <Mic className="h-3 w-3" />
+              )}
+            </button>
+          )}
+        </div>
 
         {disabled && onStop ? (
           <button
@@ -302,6 +344,14 @@ export default function MessageInput({
           </button>
         )}
       </div>
+      {isListening && interimText && (
+        <div className="mt-1.5 flex items-center gap-1.5 px-1">
+          <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
+          <span className="truncate text-xs text-zinc-400 italic">
+            {interimText}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
