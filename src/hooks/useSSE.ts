@@ -163,11 +163,109 @@ export function useAgentStream(
     [threadId, wsParam]
   );
 
+  const reattach = useCallback(
+    async (reattachThreadId: string, agentId: string) => {
+      const controllerKey = `${reattachThreadId}:${agentId}`;
+
+      // Don't re-attach if already streaming this agent
+      if (abortControllers.current.has(controllerKey)) return;
+
+      const controller = new AbortController();
+      abortControllers.current.set(controllerKey, controller);
+
+      // Initialize streaming entry
+      if (!allStreams.current.has(reattachThreadId)) {
+        allStreams.current.set(reattachThreadId, new Map());
+      }
+      allStreams.current
+        .get(reattachThreadId)!
+        .set(agentId, { agentId, content: "" });
+      triggerRender();
+
+      try {
+        const res = await fetch(
+          `/api/threads/${reattachThreadId}/stream${wsParam()}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ agentId, prompt: "" }),
+            signal: controller.signal,
+          }
+        );
+
+        if (!res.ok || !res.body) {
+          throw new Error(`Re-attach failed: ${res.status}`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const event = JSON.parse(line.slice(6));
+              if (event.type === "initial") {
+                // Set (not append) persisted content
+                const threadStreams = allStreams.current.get(reattachThreadId);
+                if (threadStreams) {
+                  threadStreams.set(agentId, { agentId, content: event.content });
+                  triggerRender();
+                }
+              } else if (event.type === "content") {
+                const threadStreams = allStreams.current.get(reattachThreadId);
+                if (threadStreams) {
+                  const existing = threadStreams.get(agentId);
+                  threadStreams.set(agentId, {
+                    agentId,
+                    content: (existing?.content ?? "") + event.text,
+                  });
+                  triggerRender();
+                }
+              } else if (event.type === "done") {
+                break;
+              } else if (event.type === "error") {
+                setError(event.message);
+              }
+            } catch {
+              // Not valid JSON
+            }
+          }
+        }
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          console.error("Re-attach failed:", err);
+        }
+      } finally {
+        abortControllers.current.delete(controllerKey);
+        const threadStreams = allStreams.current.get(reattachThreadId);
+        if (threadStreams) {
+          threadStreams.delete(agentId);
+          if (threadStreams.size === 0) {
+            allStreams.current.delete(reattachThreadId);
+            onCompleteRef.current?.(reattachThreadId);
+          }
+        }
+        triggerRender();
+      }
+    },
+    [triggerRender, wsParam]
+  );
+
   return {
     streamingMessages,
     isStreaming,
     error,
     sendMessage,
     stopAgent,
+    reattach,
   };
 }
