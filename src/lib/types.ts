@@ -21,6 +21,7 @@ export type Thread = {
   createdAt: string;
   updatedAt: string;
   archived?: boolean;
+  unreadAgents?: string[];
 };
 
 export type MessageImage = {
