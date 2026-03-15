@@ -40,7 +40,6 @@ export default function MessageBubble({
   avatarColor,
   model,
   icon,
-  isMobile,
 }: {
   message: Message;
   isOwn: boolean;
@@ -48,7 +47,6 @@ export default function MessageBubble({
   avatarColor?: string;
   model?: AgentModel;
   icon?: AgentIcon;
-  isMobile?: boolean;
 }) {
   const wsParam = useWsParam();
   const avatar = (

@@ -15,19 +15,7 @@ async function loadData(): Promise<WorkspaceData> {
     const raw = await readFile(WORKSPACE_FILE, "utf-8");
     return JSON.parse(raw) as WorkspaceData;
   } catch {
-    // Auto-seed with current project
-    const dir = process.env.NEXUS_PROJECT_DIR || process.cwd();
-    const data: WorkspaceData = {
-      workspaces: [
-        {
-          id: crypto.randomUUID(),
-          name: path.basename(dir),
-          directory: dir,
-          color: COLORS[0],
-          addedAt: new Date().toISOString(),
-        },
-      ],
-    };
+    const data: WorkspaceData = { workspaces: [] };
     await saveData(data);
     return data;
   }

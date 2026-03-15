@@ -5,13 +5,7 @@ export type StreamEvent =
   | { type: "done"; status: "complete" | "error" }
   | { type: "error"; message: string };
 
-// Lines matching these patterns are CLI diagnostic output, not content
-const IGNORED_LINE_PATTERNS = [
-  /^Loaded cached credentials/i,
-  /^Retrying with backoff/i,
-  /^Attempt \d+ failed/i,
-  /^Warning:/i,
-];
+
 
 export function createStreamParser(model: AgentModel): (chunk: string) => StreamEvent[] {
   let buffer = "";

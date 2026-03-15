@@ -150,18 +150,16 @@ export default function WorkspaceBar({
             <FolderOpen size={14} />
             {workspaces.find((w) => w.id === contextMenu.id)?.directory}
           </button>
-          {workspaces.length > 1 && (
-            <button
-              className="w-full px-3 py-1.5 text-sm text-red-400 hover:bg-zinc-700 flex items-center gap-2 text-left"
-              onClick={() => {
-                onRemoveWorkspace(contextMenu.id);
-                setContextMenu(null);
-              }}
-            >
-              <Trash2 size={14} />
-              Remove
-            </button>
-          )}
+          <button
+            className="w-full px-3 py-1.5 text-sm text-red-400 hover:bg-zinc-700 flex items-center gap-2 text-left"
+            onClick={() => {
+              onRemoveWorkspace(contextMenu.id);
+              setContextMenu(null);
+            }}
+          >
+            <Trash2 size={14} />
+            Remove
+          </button>
         </div>
       )}
     </div>

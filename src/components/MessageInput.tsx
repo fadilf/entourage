@@ -70,7 +70,7 @@ export default function MessageInput({
     });
   }, []);
 
-  const uploadImages = async (images: PendingImage[]): Promise<MessageImage[]> => {
+  const uploadImages = useCallback(async (images: PendingImage[]): Promise<MessageImage[]> => {
     const formData = new FormData();
     for (const img of images) {
       formData.append("files", img.file);
@@ -78,7 +78,7 @@ export default function MessageInput({
     const res = await fetch(`/api/uploads${wsParam}`, { method: "POST", body: formData });
     if (!res.ok) throw new Error("Upload failed");
     return res.json();
-  };
+  }, [wsParam]);
 
   const handleSend = useCallback(async () => {
     if (!canSend) return;
@@ -102,7 +102,7 @@ export default function MessageInput({
     onSendMessage(content.trim(), images);
     setContent("");
     setShowMentions(false);
-  }, [canSend, content, pendingImages, onSendMessage]);
+  }, [canSend, content, pendingImages, onSendMessage, uploadImages]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
