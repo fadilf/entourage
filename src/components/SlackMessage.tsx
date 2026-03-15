@@ -74,26 +74,6 @@ export default function SlackMessage({
         })}
       </div>
 
-      {/* Image attachments for user messages */}
-      {isUser && message.images && message.images.length > 0 && (
-        <div className="mb-1.5 flex flex-wrap gap-1.5">
-          {message.images.map((img) => (
-            <a
-              key={img.id}
-              href={`/api/uploads/${img.filename}${wsParam}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <img
-                src={`/api/uploads/${img.filename}${wsParam}`}
-                alt={img.filename}
-                className="max-h-48 max-w-64 rounded-lg border border-zinc-200 object-cover"
-              />
-            </a>
-          ))}
-        </div>
-      )}
-
       {/* Message content */}
       {isError ? (
         <div className="flex items-start gap-2 rounded-md border-l-4 border-red-500 bg-red-50 px-3 py-2 text-sm text-red-900">
@@ -157,11 +137,9 @@ export default function SlackMessage({
               td: ({ children }) => (
                 <td className="border border-zinc-200 px-2 py-1">{children}</td>
               ),
-              tr: ({ children, ...props }) => {
-                // @ts-expect-error -- node not in types but passed by react-markdown
-                const isEven = props.node?.position?.start?.line % 2 === 0;
-                return <tr className={isEven ? "bg-zinc-50" : ""}>{children}</tr>;
-              },
+              tr: ({ children }) => (
+                <tr className="even:bg-zinc-50">{children}</tr>
+              ),
               hr: () => <hr className="my-3 border-zinc-200" />,
               strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
               pre: ({ children }) => <>{children}</>,
@@ -186,6 +164,26 @@ export default function SlackMessage({
           >
             {message.content || (isStreaming ? "" : "")}
           </ReactMarkdown>
+        </div>
+      )}
+
+      {/* Image attachments for user messages — rendered below text */}
+      {isUser && message.images && message.images.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {message.images.map((img) => (
+            <a
+              key={img.id}
+              href={`/api/uploads/${img.filename}${wsParam}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                src={`/api/uploads/${img.filename}${wsParam}`}
+                alt={img.filename}
+                className="max-h-48 max-w-64 rounded-lg border border-zinc-200 object-cover"
+              />
+            </a>
+          ))}
         </div>
       )}
 

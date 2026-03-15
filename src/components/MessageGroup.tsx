@@ -32,7 +32,7 @@ export default function MessageGroup({
   return (
     <div className="border-b border-zinc-100 py-2 last:border-b-0">
       {/* Group header with avatar */}
-      <div className="flex gap-3 px-4">
+      <div className="flex gap-3 px-5">
         {/* Avatar */}
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
@@ -74,7 +74,7 @@ export default function MessageGroup({
 
       {/* Subsequent messages in the group — indented past avatar */}
       {group.messages.slice(1).map((message) => (
-        <div key={message.id} className="flex gap-3 px-4">
+        <div key={message.id} className="flex gap-3 px-5">
           {/* Spacer matching avatar width */}
           <div className="w-9 shrink-0" />
           <div className="min-w-0 flex-1">
