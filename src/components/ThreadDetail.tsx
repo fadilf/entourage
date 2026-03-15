@@ -3,14 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ThreadWithMessages, Agent, Message, MessageImage } from "@/lib/types";
 import { ChevronLeft, Pencil } from "lucide-react";
-import MessageBubble from "./MessageBubble";
+import MessageList from "./MessageList";
 import ModelIcon from "./ModelIcon";
 import MessageInput from "./MessageInput";
-
-function resolveAgent(message: Message, agents: Agent[]): Agent | undefined {
-  if (message.role === "user") return undefined;
-  return agents.find((a) => a.id === message.agentId);
-}
 
 export default function ThreadDetail({
   thread,
@@ -164,22 +159,11 @@ export default function ThreadDetail({
           ))}
         </div>
       </div>
-      <div ref={scrollRef} className={`flex flex-1 flex-col gap-4 overflow-y-auto ${isMobile ? "px-4" : "px-6"} py-5`}>
-        {allMessages.map((message) => {
-          const agent = resolveAgent(message, thread.agents);
-          return (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              isOwn={message.role === "user"}
-              agentName={agent?.name}
-              avatarColor={agent?.avatarColor}
-              model={agent?.model}
-              icon={agent?.icon}
-              isMobile={isMobile}
-            />
-          );
-        })}
+      <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto py-2">
+        <MessageList
+          messages={allMessages}
+          agents={thread.agents}
+        />
       </div>
       <MessageInput
         key={thread.id}
