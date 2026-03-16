@@ -32,7 +32,7 @@ export default function MessageGroup({
   const firstMessage = group.messages[0];
 
   return (
-    <div className="border-b border-zinc-100 py-2 last:border-b-0">
+    <div className="border-b border-zinc-100 dark:border-zinc-800 py-2 last:border-b-0">
       {/* Group header with avatar */}
       <div className="flex gap-3 px-5">
         {/* Avatar */}
@@ -42,7 +42,7 @@ export default function MessageGroup({
             isUser
               ? { backgroundColor: "#18181b" }
               : {
-                  backgroundColor: "white",
+                  backgroundColor: "var(--background)",
                   border: `1.5px solid ${agent?.avatarColor || "#71717a"}`,
                   boxShadow: `inset 0 2px 6px ${(agent?.avatarColor || "#71717a")}80`,
                 }
@@ -64,11 +64,11 @@ export default function MessageGroup({
         {/* Name + timestamp + first message */}
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
-            <span className="text-sm font-bold text-zinc-900">
+            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
               {isUser ? displayName : agent?.name || "Unknown"}
             </span>
             {!isUser && agent?.model && (
-              <span className="text-[11px] text-zinc-400">{agent.model}</span>
+              <span className="text-[11px] text-zinc-400 dark:text-zinc-500">{agent.model}</span>
             )}
             {isStreaming && !isUser && (
               <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />

@@ -13,7 +13,7 @@ function renderMentions(content: string) {
   if (parts.length === 1) return content;
   return parts.map((part, i) =>
     /^@\w+/.test(part) ? (
-      <span key={i} className="font-medium text-violet-600">
+      <span key={i} className="font-medium text-violet-600 dark:text-violet-400">
         {part}
       </span>
     ) : (
@@ -65,7 +65,7 @@ export default function SlackMessage({
   const isStreaming = message.status === "streaming";
 
   return (
-    <div className="group relative py-0.5 px-1 -mx-1 rounded hover:bg-zinc-50">
+    <div className="group relative py-0.5 px-1 -mx-1 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800">
       {/* Hover timestamp */}
       <div className="absolute right-2 top-1 hidden text-[11px] text-zinc-400 group-hover:block">
         {new Date(message.timestamp).toLocaleTimeString([], {
@@ -76,7 +76,7 @@ export default function SlackMessage({
 
       {/* Message content */}
       {isError ? (
-        <div className="flex items-start gap-2 rounded-md border-l-4 border-red-500 bg-red-50 px-3 py-2 text-sm text-red-900">
+        <div className="flex items-start gap-2 rounded-md border-l-4 border-red-500 bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm text-red-900 dark:text-red-400">
           <svg className="mt-0.5 h-4 w-4 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -85,11 +85,11 @@ export default function SlackMessage({
           <span>{message.content || "An error occurred"}</span>
         </div>
       ) : isUser ? (
-        <div className="text-sm leading-relaxed text-zinc-900 whitespace-pre-wrap">
+        <div className="text-sm leading-relaxed text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap">
           {renderMentions(message.content || "")}
         </div>
       ) : (
-        <div className="slack-markdown text-sm leading-relaxed text-zinc-900">
+        <div className="slack-markdown text-sm leading-relaxed text-zinc-900 dark:text-zinc-100">
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{
@@ -121,7 +121,7 @@ export default function SlackMessage({
                 </a>
               ),
               blockquote: ({ children }) => (
-                <blockquote className="border-l-2 border-zinc-300 bg-zinc-50 pl-3 py-1 my-2 text-zinc-600 italic">
+                <blockquote className="border-l-2 border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 pl-3 py-1 my-2 text-zinc-600 dark:text-zinc-400 italic">
                   {children}
                 </blockquote>
               ),
@@ -130,17 +130,17 @@ export default function SlackMessage({
                   <table className="min-w-full text-xs border-collapse">{children}</table>
                 </div>
               ),
-              thead: ({ children }) => <thead className="bg-zinc-100">{children}</thead>,
+              thead: ({ children }) => <thead className="bg-zinc-100 dark:bg-zinc-800">{children}</thead>,
               th: ({ children }) => (
-                <th className="border border-zinc-200 px-2 py-1 font-semibold text-left">{children}</th>
+                <th className="border border-zinc-200 dark:border-zinc-700 px-2 py-1 font-semibold text-left">{children}</th>
               ),
               td: ({ children }) => (
-                <td className="border border-zinc-200 px-2 py-1">{children}</td>
+                <td className="border border-zinc-200 dark:border-zinc-700 px-2 py-1">{children}</td>
               ),
               tr: ({ children }) => (
-                <tr className="even:bg-zinc-50">{children}</tr>
+                <tr className="even:bg-zinc-50 dark:even:bg-zinc-800">{children}</tr>
               ),
-              hr: () => <hr className="my-3 border-zinc-200" />,
+              hr: () => <hr className="my-3 border-zinc-200 dark:border-zinc-700" />,
               strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
               pre: ({ children }) => <>{children}</>,
               code: ({ className, children }) => {
@@ -149,7 +149,7 @@ export default function SlackMessage({
 
                 if (!isBlock) {
                   return (
-                    <code className="bg-zinc-100 text-zinc-800 rounded px-1.5 py-0.5 text-xs font-mono">
+                    <code className="bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded px-1.5 py-0.5 text-xs font-mono">
                       {children}
                     </code>
                   );
@@ -180,7 +180,7 @@ export default function SlackMessage({
               <img
                 src={`/api/uploads/${img.filename}${wsParam}`}
                 alt={img.filename}
-                className="max-h-48 max-w-64 rounded-lg border border-zinc-200 object-cover"
+                className="max-h-48 max-w-64 rounded-lg border border-zinc-200 dark:border-zinc-700 object-cover"
               />
             </a>
           ))}
