@@ -37,10 +37,10 @@ export default function MessageGroup({
       <div className="flex gap-3 px-5">
         {/* Avatar */}
         <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isUser ? "bg-zinc-900 dark:bg-zinc-600" : ""}`}
           style={
             isUser
-              ? { backgroundColor: "#18181b" }
+              ? undefined
               : {
                   backgroundColor: "var(--background)",
                   border: `1.5px solid ${agent?.avatarColor || "#71717a"}`,
