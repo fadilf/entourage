@@ -2,13 +2,13 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-import { NEXUS_DIR, DEFAULT_AGENTS, DEFAULT_AGENT_IDS } from "./config";
+import { ENTOURAGE_DIR, DEFAULT_AGENTS, DEFAULT_AGENT_IDS } from "./config";
 import { Agent } from "./types";
 
 type Config = { agents: Agent[]; displayName?: string };
 
 function getConfigPath(workspaceDir: string): string {
-  return path.join(workspaceDir, NEXUS_DIR, "config.json");
+  return path.join(workspaceDir, ENTOURAGE_DIR, "config.json");
 }
 
 // Write lock to serialize file writes
@@ -35,7 +35,7 @@ async function loadConfig(workspaceDir: string): Promise<Config> {
 
 async function saveConfig(workspaceDir: string, config: Config): Promise<void> {
   return withLock(async () => {
-    const dir = path.join(workspaceDir, NEXUS_DIR);
+    const dir = path.join(workspaceDir, ENTOURAGE_DIR);
     await mkdir(dir, { recursive: true });
     await writeFile(getConfigPath(workspaceDir), JSON.stringify(config, null, 2));
   });

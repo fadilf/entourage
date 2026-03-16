@@ -6,5 +6,5 @@ export async function resolveWorkspaceDir(request: Request): Promise<string> {
   if (workspaceId) {
     return getWorkspaceDir(workspaceId);
   }
-  return process.env.NEXUS_PROJECT_DIR || process.cwd();
+  return process.env.ENTOURAGE_PROJECT_DIR || process.cwd();
 }

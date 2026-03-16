@@ -206,14 +206,14 @@ class ProcessManager {
 }
 
 // Singleton via globalThis to survive HMR
-const globalKey = Symbol.for("nexus-process-manager");
+const globalKey = Symbol.for("entourage-process-manager");
 
 export function getProcessManager(): ProcessManager {
   const g = globalThis as unknown as Record<symbol, ProcessManager>;
   if (!g[globalKey]) {
     g[globalKey] = new ProcessManager();
     import("./thread-store").then(({ recoverStaleStreams }) => {
-      const workspaceDir = process.env.NEXUS_PROJECT_DIR || process.cwd();
+      const workspaceDir = process.env.ENTOURAGE_PROJECT_DIR || process.cwd();
       recoverStaleStreams(workspaceDir).catch((err) => {
         console.error("Failed to recover stale streams:", err);
       });

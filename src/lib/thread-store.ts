@@ -1,15 +1,15 @@
 import { readdir, readFile, writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
-import { NEXUS_DIR, THREADS_DIR } from "./config";
+import { ENTOURAGE_DIR, THREADS_DIR, migrateFromNexus } from "./config";
 import { Thread, Message, ThreadWithMessages, ThreadListItem, Agent } from "./types";
 import { getProcessManager } from "./process-manager";
 
 function getWorkingDirectory(): string {
-  return process.env.NEXUS_PROJECT_DIR || process.cwd();
+  return process.env.ENTOURAGE_PROJECT_DIR || process.cwd();
 }
 
 function getThreadsDir(workspaceDir: string): string {
-  return path.join(workspaceDir, NEXUS_DIR, THREADS_DIR);
+  return path.join(workspaceDir, ENTOURAGE_DIR, THREADS_DIR);
 }
 
 function getThreadPath(workspaceDir: string, threadId: string): string {
@@ -26,12 +26,13 @@ function withLock<T>(threadId: string, fn: () => Promise<T>): Promise<T> {
   return next;
 }
 
-export async function ensureNexusDir(workspaceDir: string): Promise<void> {
+export async function ensureEntourageDir(workspaceDir: string): Promise<void> {
+  await migrateFromNexus(workspaceDir);
   await mkdir(getThreadsDir(workspaceDir), { recursive: true });
 }
 
 export async function listThreads(workspaceDir: string): Promise<ThreadListItem[]> {
-  await ensureNexusDir(workspaceDir);
+  await ensureEntourageDir(workspaceDir);
   const dir = getThreadsDir(workspaceDir);
   let files: string[];
   try {
@@ -152,7 +153,7 @@ export async function clearUnreadAgents(
 }
 
 export async function createThread(workspaceDir: string, title: string, agents: Thread["agents"]): Promise<ThreadWithMessages> {
-  await ensureNexusDir(workspaceDir);
+  await ensureEntourageDir(workspaceDir);
   const now = new Date().toISOString();
   const thread: ThreadWithMessages = {
     id: generateId(),

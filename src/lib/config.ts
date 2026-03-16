@@ -1,12 +1,30 @@
 import path from "path";
+import { rename, access } from "fs/promises";
 import { Agent } from "./types";
 
-export const NEXUS_DIR = ".nexus";
+export const ENTOURAGE_DIR = ".entourage";
 export const THREADS_DIR = "threads";
 export const UPLOADS_DIR = "uploads";
 
+export async function migrateFromNexus(baseDir: string): Promise<void> {
+  const oldDir = path.join(baseDir, ".nexus");
+  const newDir = path.join(baseDir, ENTOURAGE_DIR);
+  try {
+    await access(newDir);
+    return; // already migrated
+  } catch {
+    // .entourage doesn't exist, check for .nexus
+  }
+  try {
+    await access(oldDir);
+    await rename(oldDir, newDir);
+  } catch {
+    // neither exists or already moved by another process — nothing to do
+  }
+}
+
 export function getUploadsDir(workspaceDir?: string): string {
-  return path.join(workspaceDir || process.cwd(), NEXUS_DIR, UPLOADS_DIR);
+  return path.join(workspaceDir || process.cwd(), ENTOURAGE_DIR, UPLOADS_DIR);
 }
 
 export const DEFAULT_AGENT_IDS = ["claude", "gemini"];

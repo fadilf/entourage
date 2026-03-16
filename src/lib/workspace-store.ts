@@ -3,14 +3,16 @@ import path from "path";
 import os from "os";
 import crypto from "crypto";
 import { Workspace } from "./types";
+import { migrateFromNexus } from "./config";
 
-const WORKSPACE_FILE = path.join(os.homedir(), ".nexus", "workspaces.json");
+const WORKSPACE_FILE = path.join(os.homedir(), ".entourage", "workspaces.json");
 
 type WorkspaceData = { workspaces: Workspace[] };
 
 const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#06b6d4", "#84cc16"];
 
 async function loadData(): Promise<WorkspaceData> {
+  await migrateFromNexus(os.homedir());
   try {
     const raw = await readFile(WORKSPACE_FILE, "utf-8");
     return JSON.parse(raw) as WorkspaceData;
