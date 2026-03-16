@@ -30,6 +30,14 @@ export type MessageImage = {
   ext: string;
 };
 
+export type ToolCall = {
+  id: string;
+  name: string;
+  status: "running" | "complete" | "error";
+  input?: string;
+  output?: string;
+};
+
 export type Message = {
   id: string;
   threadId: string;
@@ -39,6 +47,7 @@ export type Message = {
   timestamp: string;
   status: "streaming" | "complete" | "error";
   images?: MessageImage[];
+  toolCalls?: ToolCall[];
 };
 
 export type ThreadWithMessages = Thread & { messages: Message[] };

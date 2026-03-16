@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Agent, MessageImage } from "@/lib/types";
+import { Agent, MessageImage, ToolCall } from "@/lib/types";
 
 type StreamingMessage = {
   agentId: string;
   content: string;
+  toolCalls?: ToolCall[];
 };
 
 export function useAgentStream(
@@ -98,9 +99,32 @@ export function useAgentStream(
                 if (threadStreams) {
                   const existing = threadStreams.get(agentId);
                   threadStreams.set(agentId, {
+                    ...existing,
                     agentId,
                     content: (existing?.content ?? "") + event.text,
                   });
+                  triggerRender();
+                }
+              } else if (event.type === "tool_start") {
+                const threadStreams = allStreams.current.get(targetThreadId);
+                if (threadStreams) {
+                  const existing = threadStreams.get(agentId);
+                  const toolCalls = [...(existing?.toolCalls ?? [])];
+                  toolCalls.push({ id: event.toolId, name: event.toolName, status: "running", input: event.input });
+                  threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", toolCalls });
+                  triggerRender();
+                }
+              } else if (event.type === "tool_result") {
+                const threadStreams = allStreams.current.get(targetThreadId);
+                if (threadStreams) {
+                  const existing = threadStreams.get(agentId);
+                  const toolCalls = [...(existing?.toolCalls ?? [])];
+                  const tc = toolCalls.find((t) => t.id === event.toolId);
+                  if (tc) {
+                    tc.status = "complete";
+                    tc.output = event.output;
+                  }
+                  threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", toolCalls });
                   triggerRender();
                 }
               } else if (event.type === "done") {
@@ -225,9 +249,32 @@ export function useAgentStream(
                 if (threadStreams) {
                   const existing = threadStreams.get(agentId);
                   threadStreams.set(agentId, {
+                    ...existing,
                     agentId,
                     content: (existing?.content ?? "") + event.text,
                   });
+                  triggerRender();
+                }
+              } else if (event.type === "tool_start") {
+                const threadStreams = allStreams.current.get(reattachThreadId);
+                if (threadStreams) {
+                  const existing = threadStreams.get(agentId);
+                  const toolCalls = [...(existing?.toolCalls ?? [])];
+                  toolCalls.push({ id: event.toolId, name: event.toolName, status: "running", input: event.input });
+                  threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", toolCalls });
+                  triggerRender();
+                }
+              } else if (event.type === "tool_result") {
+                const threadStreams = allStreams.current.get(reattachThreadId);
+                if (threadStreams) {
+                  const existing = threadStreams.get(agentId);
+                  const toolCalls = [...(existing?.toolCalls ?? [])];
+                  const tc = toolCalls.find((t) => t.id === event.toolId);
+                  if (tc) {
+                    tc.status = "complete";
+                    tc.output = event.output;
+                  }
+                  threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", toolCalls });
                   triggerRender();
                 }
               } else if (event.type === "done") {

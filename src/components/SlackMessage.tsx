@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { useWsParam } from "@/contexts/WorkspaceContext";
+import ToolCallBlock from "./ToolCallBlock";
 
 function renderMentions(content: string) {
   const parts = content.split(/(@\w+)/g);
@@ -73,6 +74,15 @@ export default function SlackMessage({
           minute: "2-digit",
         })}
       </div>
+
+      {/* Tool calls — rendered before text since they execute first */}
+      {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
+        <div className="mb-1">
+          {message.toolCalls.map((tc) => (
+            <ToolCallBlock key={tc.id} toolCall={tc} />
+          ))}
+        </div>
+      )}
 
       {/* Message content */}
       {isError ? (

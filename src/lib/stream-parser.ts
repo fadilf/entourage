@@ -2,6 +2,8 @@ import { AgentModel } from "./types";
 
 export type StreamEvent =
   | { type: "content"; text: string }
+  | { type: "tool_start"; toolId: string; toolName: string; input?: string }
+  | { type: "tool_result"; toolId: string; output: string }
   | { type: "done"; status: "complete" | "error" }
   | { type: "error"; message: string };
 
@@ -31,6 +33,16 @@ export function createStreamParser(model: AgentModel): (chunk: string) => Stream
           continue;
         }
 
+        // Claude CLI tool events (from stream-json --verbose)
+        if (model === "claude") {
+          const toolEvents = extractClaudeToolEvents(json);
+          if (toolEvents.length > 0) {
+            events.push(...toolEvents);
+            // Don't continue — the same "assistant" message may also contain text content
+            // But if it only had tool_use, extractText will return null anyway
+          }
+        }
+
         const text = extractText(json, model);
         if (text) {
           events.push({ type: "content", text });
@@ -49,28 +61,80 @@ export function createStreamParser(model: AgentModel): (chunk: string) => Stream
   };
 }
 
+/**
+ * Extract tool events from Claude CLI's stream-json format.
+ *
+ * Claude CLI emits tool calls as full assistant messages:
+ *   {"type":"assistant","message":{"content":[{"type":"tool_use","id":"...","name":"Read","input":{...}}]}}
+ *
+ * And tool results as user messages:
+ *   {"type":"user","message":{"content":[{"tool_use_id":"...","type":"tool_result","content":"..."}]}}
+ */
+function extractClaudeToolEvents(json: Record<string, unknown>): StreamEvent[] {
+  const events: StreamEvent[] = [];
+  const message = json.message as Record<string, unknown> | undefined;
+  if (!message) return events;
+
+  const contentArray = message.content as unknown[] | undefined;
+  if (!Array.isArray(contentArray)) return events;
+
+  // Tool use from assistant messages
+  if (json.type === "assistant") {
+    for (const block of contentArray) {
+      const b = block as Record<string, unknown>;
+      if (b.type === "tool_use" && typeof b.id === "string" && typeof b.name === "string") {
+        const input = b.input ? JSON.stringify(b.input) : undefined;
+        events.push({ type: "tool_start", toolId: b.id, toolName: b.name, input });
+      }
+    }
+  }
+
+  // Tool results from user messages (tool_result type in content array)
+  if (json.type === "user") {
+    for (const block of contentArray) {
+      const b = block as Record<string, unknown>;
+      if (b.type === "tool_result" && typeof b.tool_use_id === "string") {
+        const output = typeof b.content === "string" ? b.content : "";
+        events.push({ type: "tool_result", toolId: b.tool_use_id, output });
+      }
+    }
+  }
+
+  return events;
+}
+
 function extractText(json: Record<string, unknown>, model: AgentModel): string | null {
   // Claude stream-json format
   if (model === "claude") {
-    // Claude emits various event types; content is in "assistant" type with "content" field
-    if (json.type === "assistant" && typeof json.content === "string") {
-      return json.content;
+    // Assistant message with content array — extract text blocks
+    if (json.type === "assistant") {
+      const message = json.message as Record<string, unknown> | undefined;
+      if (message) {
+        const contentArray = message.content as unknown[] | undefined;
+        if (Array.isArray(contentArray)) {
+          const textParts: string[] = [];
+          for (const block of contentArray) {
+            const b = block as Record<string, unknown>;
+            if (b.type === "text" && typeof b.text === "string") {
+              textParts.push(b.text);
+            }
+          }
+          if (textParts.length > 0) return textParts.join("");
+        }
+      }
+      // Legacy: content as string
+      if (typeof json.content === "string") {
+        return json.content;
+      }
     }
-    // Also handle content_block_delta style
+    // Also handle content_block_delta style (API format, just in case)
     if (json.type === "content_block_delta") {
       const delta = json.delta as Record<string, unknown> | undefined;
       if (delta && typeof delta.text === "string") {
         return delta.text;
       }
     }
-    // Result message
-    if (json.type === "result" && typeof json.result === "string") {
-      return json.result;
-    }
-    // Simple content field
-    if (typeof json.content === "string" && json.content) {
-      return json.content;
-    }
+    // Skip "result" events — they duplicate the text already received from "assistant" messages
   }
 
   // Gemini stream-json format

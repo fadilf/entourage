@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getThread, addMessage, updateMessage, addUnreadAgent } from "@/lib/thread-store";
 import { getProcessManager } from "@/lib/process-manager";
 import { createStreamParser } from "@/lib/stream-parser";
-import { AgentModel, MessageImage } from "@/lib/types";
+import { AgentModel, MessageImage, ToolCall } from "@/lib/types";
 import { loadAgents } from "@/lib/agent-store";
 import { buildContextualPrompt } from "@/lib/context";
 import path from "path";
@@ -64,7 +64,7 @@ export async function POST(
           try {
             const events = reattachParser(data.toString());
             for (const event of events) {
-              if (event.type === "content") {
+              if (event.type === "content" || event.type.startsWith("tool_")) {
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
               }
             }
@@ -122,6 +122,7 @@ export async function POST(
   const enrichedPrompt = buildContextualPrompt(thread.messages, agent.id, thread.agents, prompt);
 
   let accumulatedContent = "";
+  const accumulatedToolCalls: ToolCall[] = [];
   let lastPersist = Date.now();
   const parser = createStreamParser(agent.model as AgentModel);
 
@@ -152,6 +153,25 @@ export async function POST(
                 } catch {
                   // Client disconnected
                 }
+              } else if (event.type === "tool_start") {
+                accumulatedToolCalls.push({
+                  id: event.toolId,
+                  name: event.toolName,
+                  status: "running",
+                  input: event.input,
+                });
+                try {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+                } catch { /* Client disconnected */ }
+              } else if (event.type === "tool_result") {
+                const tc = accumulatedToolCalls.find((t) => t.id === event.toolId);
+                if (tc) {
+                  tc.status = "complete";
+                  tc.output = event.output;
+                }
+                try {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+                } catch { /* Client disconnected */ }
               } else if (event.type === "error") {
                 // API-level error from the CLI (e.g. rate limit, auth failure)
                 const errorText = `[Error: ${event.message}]`;
@@ -167,7 +187,10 @@ export async function POST(
             // Periodic persist every 5s
             if (Date.now() - lastPersist > 5000) {
               lastPersist = Date.now();
-              updateMessage(workspaceDir, threadId, assistantMsg.id, { content: accumulatedContent }).catch(() => {});
+              updateMessage(workspaceDir, threadId, assistantMsg.id, {
+                content: accumulatedContent,
+                ...(accumulatedToolCalls.length > 0 ? { toolCalls: accumulatedToolCalls } : {}),
+              }).catch(() => {});
             }
           },
           // onClose
@@ -176,9 +199,16 @@ export async function POST(
             if (clientDisconnected && status === "complete") {
               addUnreadAgent(workspaceDir, threadId, agentId).catch(() => {});
             }
+            // Mark any still-running tool calls as complete (or error)
+            for (const tc of accumulatedToolCalls) {
+              if (tc.status === "running") {
+                tc.status = status === "error" ? "error" : "complete";
+              }
+            }
             updateMessage(workspaceDir, threadId, assistantMsg.id, {
               content: accumulatedContent || (status === "error" ? `[Process exited with code ${code}]` : ""),
               status,
+              ...(accumulatedToolCalls.length > 0 ? { toolCalls: accumulatedToolCalls } : {}),
             }).catch(() => {});
 
             try {
