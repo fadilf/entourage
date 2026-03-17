@@ -178,7 +178,7 @@ export default function ThreadDetail({
           messages={allMessages}
           agents={thread.agents}
           displayName={displayName}
-          onRewind={handleRewindRequest}
+          onRewind={isStreaming ? undefined : handleRewindRequest}
         />
       </div>
       <MessageInput

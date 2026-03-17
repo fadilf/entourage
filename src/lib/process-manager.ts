@@ -213,7 +213,11 @@ class ProcessManager {
                 if (stderrText) onError(new Error(summarizeStderr(stderrText)));
               }
             } else {
-              if (!this.killedSessions.has(sessionId)) { this.usedSessions.add(sessionId); }
+              if (!this.killedSessions.has(sessionId)) {
+                this.usedSessions.add(sessionId);
+              } else {
+                this.killedSessions.delete(sessionId);
+              }
             }
             onClose(retryCode);
             this.processes.delete(k);
@@ -231,7 +235,11 @@ class ProcessManager {
         }
       } else {
         // Mark session as used so follow-ups use --resume
-        if (!this.killedSessions.has(sessionId)) { this.usedSessions.add(sessionId); }
+        if (!this.killedSessions.has(sessionId)) {
+          this.usedSessions.add(sessionId);
+        } else {
+          this.killedSessions.delete(sessionId);
+        }
       }
       onClose(code);
       // Clean up after process exits
