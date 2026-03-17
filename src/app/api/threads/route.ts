@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "title and agentIds required" }, { status: 400 });
   }
 
-  const allAgents = await loadAgents(workspaceDir);
+  const allAgents = await loadAgents();
   const agents: Agent[] = agentIds
     .map((id: string) => allAgents.find((a) => a.id === id))
     .filter((a): a is Agent => a !== undefined);

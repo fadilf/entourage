@@ -27,7 +27,7 @@ export async function POST(
   const imagePaths = images?.map((img) => path.join(getUploadsDir(workspaceDir), img.filename)) ?? [];
 
   // Resolve fresh agent data from store (picks up personality edits)
-  const allAgents = await loadAgents(workspaceDir);
+  const allAgents = await loadAgents();
   const freshAgent = allAgents.find((a) => a.id === agentId);
   // Fall back to thread-stored agent data if agent was deleted
   const agent = freshAgent ?? thread.agents.find((a) => a.id === agentId);

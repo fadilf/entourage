@@ -2,14 +2,13 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-import { ENTOURAGE_DIR, DEFAULT_AGENTS, DEFAULT_AGENT_IDS } from "./config";
+import { DEFAULT_AGENTS, DEFAULT_AGENT_IDS } from "./config";
 import { Agent } from "./types";
 
 type Config = { agents: Agent[]; displayName?: string };
 
-function getConfigPath(workspaceDir: string): string {
-  return path.join(workspaceDir, ENTOURAGE_DIR, "config.json");
-}
+const GLOBAL_CONFIG_DIR = path.join(os.homedir(), ".entourage");
+const GLOBAL_CONFIG_PATH = path.join(GLOBAL_CONFIG_DIR, "config.json");
 
 // Write lock to serialize file writes
 let writeLock: Promise<void> = Promise.resolve();
@@ -21,34 +20,66 @@ function withLock<T>(fn: () => Promise<T>): Promise<T> {
   return next;
 }
 
-async function loadConfig(workspaceDir: string): Promise<Config> {
+let migrated = false;
+
+async function migrateIfNeeded(): Promise<void> {
+  if (migrated) return;
   try {
-    const raw = await readFile(getConfigPath(workspaceDir), "utf-8");
+    await readFile(GLOBAL_CONFIG_PATH, "utf-8");
+    migrated = true;
+    return;
+  } catch {
+    // Global config doesn't exist yet — try to migrate from first workspace
+  }
+
+  try {
+    const wsRaw = await readFile(path.join(GLOBAL_CONFIG_DIR, "workspaces.json"), "utf-8");
+    const wsData = JSON.parse(wsRaw) as { workspaces: { directory: string }[] };
+    for (const ws of wsData.workspaces) {
+      try {
+        const localConfig = await readFile(path.join(ws.directory, ".entourage", "config.json"), "utf-8");
+        JSON.parse(localConfig);
+        await mkdir(GLOBAL_CONFIG_DIR, { recursive: true });
+        await writeFile(GLOBAL_CONFIG_PATH, localConfig);
+        migrated = true;
+        return;
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // No workspaces.json or can't read it
+  }
+}
+
+async function loadConfig(): Promise<Config> {
+  await migrateIfNeeded();
+  try {
+    const raw = await readFile(GLOBAL_CONFIG_PATH, "utf-8");
     return JSON.parse(raw) as Config;
   } catch {
     const agents = DEFAULT_AGENTS.map((a) => ({ ...a, isDefault: true }));
     const config: Config = { agents };
-    await saveConfig(workspaceDir, config);
+    await saveConfig(config);
     return config;
   }
 }
 
-async function saveConfig(workspaceDir: string, config: Config): Promise<void> {
+async function saveConfig(config: Config): Promise<void> {
   return withLock(async () => {
-    const dir = path.join(workspaceDir, ENTOURAGE_DIR);
-    await mkdir(dir, { recursive: true });
-    await writeFile(getConfigPath(workspaceDir), JSON.stringify(config, null, 2));
+    await mkdir(GLOBAL_CONFIG_DIR, { recursive: true });
+    await writeFile(GLOBAL_CONFIG_PATH, JSON.stringify(config, null, 2));
   });
 }
 
-export async function loadAgents(workspaceDir: string): Promise<Agent[]> {
-  const config = await loadConfig(workspaceDir);
+export async function loadAgents(): Promise<Agent[]> {
+  const config = await loadConfig();
   return config.agents;
 }
 
-export async function saveAgents(workspaceDir: string, agents: Agent[]): Promise<void> {
-  const config = await loadConfig(workspaceDir);
-  await saveConfig(workspaceDir, { ...config, agents });
+export async function saveAgents(agents: Agent[]): Promise<void> {
+  const config = await loadConfig();
+  await saveConfig({ ...config, agents });
 }
 
 export function getDefaultDisplayName(): string {
@@ -59,14 +90,14 @@ export function getDefaultDisplayName(): string {
   }
 }
 
-export async function loadDisplayName(workspaceDir: string): Promise<string> {
-  const config = await loadConfig(workspaceDir);
+export async function loadDisplayName(): Promise<string> {
+  const config = await loadConfig();
   return config.displayName || getDefaultDisplayName();
 }
 
-export async function saveDisplayName(workspaceDir: string, displayName: string): Promise<void> {
-  const config = await loadConfig(workspaceDir);
-  await saveConfig(workspaceDir, { ...config, displayName: displayName || undefined });
+export async function saveDisplayName(displayName: string): Promise<void> {
+  const config = await loadConfig();
+  await saveConfig({ ...config, displayName: displayName || undefined });
 }
 
 function validateAgentName(name: string): void {
@@ -75,7 +106,7 @@ function validateAgentName(name: string): void {
   }
 }
 
-export async function createAgent(workspaceDir: string, data: {
+export async function createAgent(data: {
   name: string;
   model: Agent["model"];
   avatarColor: string;
@@ -83,7 +114,7 @@ export async function createAgent(workspaceDir: string, data: {
   personality?: string;
 }): Promise<Agent> {
   validateAgentName(data.name);
-  const agents = await loadAgents(workspaceDir);
+  const agents = await loadAgents();
 
   if (agents.some((a) => a.name.toLowerCase() === data.name.toLowerCase())) {
     throw new Error(`Agent name "${data.name}" is already taken`);
@@ -100,12 +131,12 @@ export async function createAgent(workspaceDir: string, data: {
   };
 
   agents.push(agent);
-  await saveAgents(workspaceDir, agents);
+  await saveAgents(agents);
   return agent;
 }
 
-export async function updateAgent(workspaceDir: string, id: string, updates: Partial<Omit<Agent, "id" | "isDefault">>): Promise<Agent> {
-  const agents = await loadAgents(workspaceDir);
+export async function updateAgent(id: string, updates: Partial<Omit<Agent, "id" | "isDefault">>): Promise<Agent> {
+  const agents = await loadAgents();
   const idx = agents.findIndex((a) => a.id === id);
   if (idx === -1) throw new Error("Agent not found");
 
@@ -119,24 +150,24 @@ export async function updateAgent(workspaceDir: string, id: string, updates: Par
   }
 
   agents[idx] = { ...agents[idx], ...updates };
-  await saveAgents(workspaceDir, agents);
+  await saveAgents(agents);
   return agents[idx];
 }
 
-export async function deleteAgent(workspaceDir: string, id: string): Promise<void> {
+export async function deleteAgent(id: string): Promise<void> {
   if (DEFAULT_AGENT_IDS.includes(id)) {
     throw new Error("Cannot delete default agents");
   }
 
-  const agents = await loadAgents(workspaceDir);
+  const agents = await loadAgents();
   const filtered = agents.filter((a) => a.id !== id);
   if (filtered.length === agents.length) {
     throw new Error("Agent not found");
   }
-  await saveAgents(workspaceDir, filtered);
+  await saveAgents(filtered);
 }
 
-export async function getAgent(workspaceDir: string, id: string): Promise<Agent | null> {
-  const agents = await loadAgents(workspaceDir);
+export async function getAgent(id: string): Promise<Agent | null> {
+  const agents = await loadAgents();
   return agents.find((a) => a.id === id) ?? null;
 }

@@ -5,8 +5,8 @@ import { resolveWorkspaceDir } from "@/lib/workspace-context";
 export async function GET(request: Request) {
   const workspaceDir = await resolveWorkspaceDir(request);
   const [agents, displayName] = await Promise.all([
-    loadAgents(workspaceDir),
-    loadDisplayName(workspaceDir),
+    loadAgents(),
+    loadDisplayName(),
   ]);
   return NextResponse.json({
     workingDirectory: workspaceDir,
@@ -16,13 +16,12 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const workspaceDir = await resolveWorkspaceDir(request);
   const body = await request.json();
 
   if (typeof body.displayName === "string") {
-    await saveDisplayName(workspaceDir, body.displayName.trim());
+    await saveDisplayName(body.displayName.trim());
   }
 
-  const displayName = await loadDisplayName(workspaceDir);
+  const displayName = await loadDisplayName();
   return NextResponse.json({ displayName });
 }

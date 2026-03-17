@@ -29,7 +29,7 @@ export async function POST(
   });
 
   // Parse @mentions against all available agents
-  const allAgents = await loadAgents(workspaceDir);
+  const allAgents = await loadAgents();
   const mentionedAgents = parseMentions(content, allAgents);
   const targetAgents = mentionedAgents.length > 0
     ? mentionedAgents
