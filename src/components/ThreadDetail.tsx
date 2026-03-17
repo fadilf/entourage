@@ -22,7 +22,7 @@ export default function ThreadDetail({
   onRewind,
 }: {
   thread: ThreadWithMessages | null;
-  streamingMessages: Map<string, { agentId: string; content: string; toolCalls?: import("@/lib/types").ToolCall[]; contentBlocks?: import("@/lib/types").ContentBlock[] }>;
+  streamingMessages: Map<string, { agentId: string; content: string; toolCalls?: import("@/lib/types").ToolCall[]; contentBlocks?: import("@/lib/types").ContentBlock[]; isReattach?: boolean }>;
   onSendMessage: (content: string, images?: MessageImage[]) => void;
   onStop: (agentId: string) => void;
   onRenameThread?: (title: string) => void;
@@ -88,10 +88,16 @@ export default function ThreadDetail({
       status: "streaming" as const,
       ...(data.toolCalls?.length ? { toolCalls: data.toolCalls } : {}),
       ...(data.contentBlocks?.length ? { contentBlocks: data.contentBlocks } : {}),
+      ...(data.isReattach ? { isReattach: true } : {}),
     })
   );
 
-  const allMessages = [...thread.messages, ...streamingMsgs];
+  // When reattaching, replace the persisted streaming message with the live one
+  const streamingAgentIds = new Set(streamingMessages.keys());
+  const filteredMessages = thread.messages.filter(
+    (m) => !(m.status === "streaming" && m.agentId && streamingAgentIds.has(m.agentId))
+  );
+  const allMessages = [...filteredMessages, ...streamingMsgs];
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">

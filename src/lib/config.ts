@@ -39,7 +39,7 @@ export function getCliCommand(model: string, prompt: string, sessionId: string, 
   }
 
   if (model === "claude") {
-    const args = ["-p", fullPrompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions"];
+    const args = ["-p", fullPrompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions", "--chrome"];
     if (isResume) {
       args.push("--resume", sessionId);
     } else {

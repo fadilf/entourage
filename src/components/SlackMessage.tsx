@@ -219,7 +219,7 @@ export default function SlackMessage({
 
       {/* Streaming states */}
       {isStreaming && !message.content && (
-        <span className="text-xs text-zinc-400 italic">Reconnecting...</span>
+        <span className="text-xs text-zinc-400 italic">{message.isReattach ? "Reconnecting..." : "Thinking..."}</span>
       )}
     </div>
   );

@@ -2,7 +2,7 @@
 
 ## Commands
 
-- `npm run dev` — Start dev server (Next.js, port 3000)
+- `npm run dev` — Start dev server (Next.js, port 5555)
 - `npm run build` — Production build
 - `npm run lint` — ESLint (flat config, next/core-web-vitals + typescript)
 

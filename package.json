@@ -1,12 +1,26 @@
 {
   "name": "entourage",
   "version": "0.1.0",
-  "private": true,
+  "bin": {
+    "entourage": "./bin/entourage.js"
+  },
+  "files": [
+    "bin/",
+    ".next/",
+    "public/",
+    "src/",
+    "next.config.ts",
+    "tsconfig.json",
+    "postcss.config.mjs",
+    "package.json"
+  ],
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 5555",
+    "kill": "lsof -ti:5555 | xargs kill",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "prepublishOnly": "next build"
   },
   "dependencies": {
     "lucide-react": "^0.577.0",

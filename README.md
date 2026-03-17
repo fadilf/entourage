@@ -33,7 +33,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to start chatting.
+Open [http://localhost:5555](http://localhost:5555) to start chatting.
 
 ### Environment
 

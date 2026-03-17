@@ -8,6 +8,7 @@ type StreamingMessage = {
   content: string;
   toolCalls?: ToolCall[];
   contentBlocks?: ContentBlock[];
+  isReattach?: boolean;
 };
 
 export function useAgentStream(
@@ -222,7 +223,7 @@ export function useAgentStream(
       }
       allStreams.current
         .get(reattachThreadId)!
-        .set(agentId, { agentId, content: "" });
+        .set(agentId, { agentId, content: "", isReattach: true });
       triggerRender();
 
       try {
@@ -260,7 +261,7 @@ export function useAgentStream(
                 // Set (not append) persisted content
                 const threadStreams = allStreams.current.get(reattachThreadId);
                 if (threadStreams) {
-                  threadStreams.set(agentId, { agentId, content: event.content });
+                  threadStreams.set(agentId, { agentId, content: event.content, isReattach: false });
                   triggerRender();
                 }
               } else if (event.type === "content") {

@@ -53,6 +53,7 @@ export type Message = {
   images?: MessageImage[];
   toolCalls?: ToolCall[];
   contentBlocks?: ContentBlock[];
+  isReattach?: boolean;
 };
 
 export type ThreadWithMessages = Thread & { messages: Message[] };

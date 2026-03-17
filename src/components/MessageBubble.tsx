@@ -155,7 +155,7 @@ export default function MessageBubble({
             </div>
           )}
           {isStreaming && !message.content && (
-            <span className="text-xs text-zinc-400 dark:text-zinc-500 italic">Reconnecting...</span>
+            <span className="text-xs text-zinc-400 dark:text-zinc-500 italic">{message.isReattach ? "Reconnecting..." : "Thinking..."}</span>
           )}
           {isStreaming && (
             <span className="inline-flex ml-1">
