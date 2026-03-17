@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import DirectoryBrowser from "./DirectoryBrowser";
+import { Workspace, Icon } from "@/lib/types";
+import IconPicker, { renderIcon } from "./IconPicker";
 
 const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#06b6d4", "#84cc16"];
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onAdded: (workspace: { id: string; name: string; directory: string; color: string; addedAt: string }) => void;
+  onAdded: (workspace: Workspace) => void;
   inline?: boolean;
 };
 
@@ -17,8 +19,15 @@ export default function AddWorkspaceDialog({ open, onClose, onAdded, inline }: P
   const [directory, setDirectory] = useState("");
   const [name, setName] = useState("");
   const [color, setColor] = useState(COLORS[0]);
+  const [icon, setIcon] = useState<Icon | undefined>(undefined);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const getInitials = (name: string) => {
+    const words = name.split(/[\s-_]+/);
+    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
 
   if (!open && !inline) return null;
 
@@ -40,6 +49,7 @@ export default function AddWorkspaceDialog({ open, onClose, onAdded, inline }: P
           directory: directory.trim(),
           name: name.trim() || undefined,
           color,
+          icon,
         }),
       });
 
@@ -54,6 +64,7 @@ export default function AddWorkspaceDialog({ open, onClose, onAdded, inline }: P
       setDirectory("");
       setName("");
       setColor(COLORS[0]);
+      setIcon(undefined);
       onClose();
     } catch {
       setError("Failed to add workspace");
@@ -111,6 +122,42 @@ export default function AddWorkspaceDialog({ open, onClose, onAdded, inline }: P
               />
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            Icon <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
+          </label>
+
+          {/* Live preview */}
+          <div className="flex items-center gap-3 mb-3">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold text-white"
+              style={{ backgroundColor: color }}
+            >
+              {icon ? (
+                renderIcon(icon, "h-5 w-5")
+              ) : (
+                <span>{getInitials(name || directory.split("/").pop() || "WS")}</span>
+              )}
+            </div>
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">Preview</span>
+          </div>
+
+          <IconPicker
+            value={icon}
+            onChange={setIcon}
+            enableUpload
+          />
+          {icon && (
+            <button
+              type="button"
+              onClick={() => setIcon(undefined)}
+              className="mt-1 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+            >
+              Remove icon
+            </button>
+          )}
         </div>
 
         {error && (
