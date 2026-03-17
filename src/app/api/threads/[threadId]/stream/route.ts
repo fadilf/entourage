@@ -50,13 +50,10 @@ export async function POST(
           clientDisconnected = true;
         });
 
-        // Send persisted content as initial event (instead of replaying buffer)
-        const streamingMsg = thread!.messages.find(
-          (m) => m.agentId === agentId && m.status === "streaming"
-        );
-        if (streamingMsg && streamingMsg.content) {
+        // Send in-memory accumulated content (avoids gap from periodic persist)
+        if (existing.accumulatedContent) {
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "initial", content: streamingMsg.content })}\n\n`)
+            encoder.encode(`data: ${JSON.stringify({ type: "initial", content: existing.accumulatedContent })}\n\n`)
           );
         }
 
@@ -155,6 +152,9 @@ export async function POST(
             for (const event of events) {
               if (event.type === "content") {
                 accumulatedContent += event.text;
+                // Keep process entry in sync for re-attachment
+                const proc = pm.getProcess(threadId, agent.id);
+                if (proc) proc.accumulatedContent = accumulatedContent;
                 // Append to last text block or create new one
                 const lastBlock = accumulatedBlocks[accumulatedBlocks.length - 1];
                 if (lastBlock && lastBlock.type === "text") {
