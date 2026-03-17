@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
 import { loadAgents, loadDisplayName, saveDisplayName } from "@/lib/agent-store";
-import { resolveWorkspaceDir } from "@/lib/workspace-context";
 
-export async function GET(request: Request) {
-  const workspaceDir = await resolveWorkspaceDir(request);
+export async function GET() {
   const [agents, displayName] = await Promise.all([
     loadAgents(),
     loadDisplayName(),
   ]);
-  return NextResponse.json({
-    workingDirectory: workspaceDir,
-    agents,
-    displayName,
-  });
+  return NextResponse.json({ agents, displayName });
 }
 
 export async function PATCH(request: Request) {
