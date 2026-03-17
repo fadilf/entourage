@@ -11,7 +11,7 @@ export default function ContextMenu({
   x: number;
   y: number;
   onClose: () => void;
-  items: { label: string; icon: React.ReactNode; onClick: () => void; disabled?: boolean }[];
+  items: { label: string; icon: React.ReactNode; onClick: () => void; disabled?: boolean; disabledReason?: string }[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -33,6 +33,7 @@ export default function ContextMenu({
         <button
           key={item.label}
           disabled={item.disabled}
+          title={item.disabled && item.disabledReason ? item.disabledReason : undefined}
           onClick={() => {
             if (item.disabled) return;
             item.onClick();

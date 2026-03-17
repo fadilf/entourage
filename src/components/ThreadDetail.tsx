@@ -211,6 +211,7 @@ export default function ThreadDetail({
               icon: <RotateCcw className="h-4 w-4" />,
               onClick: () => setRewindConfirm(contextMenu.messageId),
               disabled: isStreaming,
+              disabledReason: "Can't rewind while an agent is running",
             },
           ]}
         />
