@@ -4,7 +4,7 @@ import { getProcessManager } from "@/lib/process-manager";
 import { createStreamParser } from "@/lib/stream-parser";
 import { AgentModel, MessageImage, ToolCall, ContentBlock } from "@/lib/types";
 import { loadAgents } from "@/lib/agent-store";
-import { buildContextualPrompt } from "@/lib/context";
+import { buildContextualPrompt, buildFullHistoryPrompt } from "@/lib/context";
 import path from "path";
 import { getUploadsDir } from "@/lib/config";
 import { resolveWorkspaceDir } from "@/lib/workspace-context";
@@ -120,6 +120,10 @@ export async function POST(
   );
 
   const enrichedPrompt = buildContextualPrompt(thread.messages, agent.id, thread.agents, prompt);
+  // Build full history prompt for fallback when --resume fails (session lost)
+  const fullHistoryPrompt = hasHistory
+    ? buildFullHistoryPrompt(thread.messages, agent.id, thread.agents, prompt)
+    : undefined;
 
   let accumulatedContent = "";
   const accumulatedToolCalls: ToolCall[] = [];
@@ -249,7 +253,8 @@ export async function POST(
           },
           hasHistory,
           agent.personality,
-          imagePaths.length > 0 ? imagePaths : undefined
+          imagePaths.length > 0 ? imagePaths : undefined,
+          fullHistoryPrompt
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";

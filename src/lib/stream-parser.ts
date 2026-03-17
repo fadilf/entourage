@@ -26,9 +26,13 @@ export function createStreamParser(model: AgentModel): (chunk: string) => Stream
         const json = JSON.parse(trimmed);
 
         // Handle error result events from both CLIs
-        if (json.type === "result" && json.status === "error") {
+        if (json.type === "result" && (json.status === "error" || json.is_error === true)) {
           const error = json.error as Record<string, unknown> | undefined;
-          const message = typeof error?.message === "string" ? error.message : "Process ended with an error";
+          const errors = json.errors as string[] | undefined;
+          const message =
+            (typeof error?.message === "string" ? error.message : null) ??
+            (Array.isArray(errors) && errors.length > 0 ? errors[0] : null) ??
+            "Process ended with an error";
           events.push({ type: "error", message });
           continue;
         }

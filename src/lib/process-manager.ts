@@ -71,7 +71,8 @@ class ProcessManager {
     onError: (err: Error) => void,
     hasHistory: boolean = false,
     personality?: string,
-    imagePaths?: string[]
+    imagePaths?: string[],
+    fullHistoryPrompt?: string
   ): ChildProcess {
     const k = this.key(threadId, agentId);
 
@@ -174,7 +175,9 @@ class ProcessManager {
         // Retry with --session-id to start a fresh CLI session.
         if (isResume && (entry.buffer.length === 0 || resumeFailedWithError)) {
           this.processes.delete(k);
-          const fresh = getCliCommand(model, prompt, sessionId, false, personality, imagePaths);
+          // Use full history prompt so the fresh session has conversation context
+          const retryPrompt = fullHistoryPrompt || prompt;
+          const fresh = getCliCommand(model, retryPrompt, sessionId, false, personality, imagePaths);
           const retryChild = cpSpawn(fresh.cmd, fresh.args, {
             cwd,
             stdio: ["ignore", "pipe", "pipe"],
