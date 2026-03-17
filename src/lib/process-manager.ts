@@ -38,6 +38,30 @@ function summarizeStderr(stderr: string): string {
   return firstLine.length > 200 ? firstLine.slice(0, 200) + "..." : firstLine;
 }
 
+/**
+ * Check if a parsed JSON line indicates a resume failure.
+ */
+function isResumeError(json: Record<string, unknown>, model: AgentModel): boolean {
+  // Claude/Gemini: result event with error flag
+  if (json.type === "result" && json.is_error === true) return true;
+  // Codex: turn.failed or stream-level error
+  if (model === "codex" && (json.type === "turn.failed" || json.type === "error")) return true;
+  return false;
+}
+
+/**
+ * Check if a parsed JSON line indicates the session is alive (resume succeeded).
+ */
+function hasSuccessSignal(json: Record<string, unknown>, model: AgentModel): boolean {
+  if (model === "codex") {
+    // Codex: item events or turn.started mean the session is active
+    const t = json.type as string;
+    return t === "item.started" || t === "item.updated" || t === "item.completed" || t === "turn.started";
+  }
+  // Claude/Gemini: anything that's not a "result" event
+  return json.type !== "result";
+}
+
 class ProcessManager {
   private processes = new Map<string, ProcessEntry>();
   private usedSessions = new Set<string>(); // Track sessions that have been used
@@ -120,9 +144,9 @@ class ProcessManager {
           if (!trimmed) return false;
           try {
             const json = JSON.parse(trimmed);
-            return json.type !== "result";
+            return hasSuccessSignal(json, model);
           } catch {
-            return true; // Non-JSON output means real content
+            return model !== "codex"; // Non-JSON: real content for Claude, noise for Codex
           }
         });
         if (hasNonErrorContent) {
@@ -166,7 +190,7 @@ class ProcessManager {
         try {
           const lastLine = output.split("\n").filter(l => l.trim()).pop() ?? "";
           const json = JSON.parse(lastLine);
-          return json.type === "result" && json.is_error === true;
+          return isResumeError(json, model);
         } catch {
           return false;
         }
