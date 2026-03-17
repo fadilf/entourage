@@ -241,6 +241,34 @@ export async function addAgentsToThread(workspaceDir: string, threadId: string, 
   });
 }
 
+export async function truncateAfterMessage(
+  workspaceDir: string,
+  threadId: string,
+  messageId: string
+): Promise<ThreadWithMessages | null> {
+  return withLock(threadId, async () => {
+    const raw = await readFile(getThreadPath(workspaceDir, threadId), "utf-8");
+    const thread = JSON.parse(raw) as ThreadWithMessages;
+
+    const index = thread.messages.findIndex((m) => m.id === messageId);
+    if (index === -1) return null;
+
+    thread.messages = thread.messages.slice(0, index + 1);
+
+    // Fix any stale streaming messages at or before the truncation point
+    for (const msg of thread.messages) {
+      if (msg.status === "streaming") {
+        msg.status = "error";
+        msg.content += "\n\n[Stream interrupted]";
+      }
+    }
+
+    thread.updatedAt = new Date().toISOString();
+    await writeFile(getThreadPath(workspaceDir, threadId), JSON.stringify(thread, null, 2));
+    return thread;
+  });
+}
+
 export async function deleteThread(workspaceDir: string, threadId: string): Promise<void> {
   try {
     await unlink(getThreadPath(workspaceDir, threadId));
