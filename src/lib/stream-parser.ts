@@ -11,6 +11,7 @@ export type StreamEvent =
 
 export function createStreamParser(model: AgentModel): (chunk: string) => StreamEvent[] {
   let buffer = "";
+  const codexExtractor = model === "codex" ? createCodexEventExtractor() : null;
 
   return (chunk: string): StreamEvent[] => {
     buffer += chunk;
@@ -34,6 +35,13 @@ export function createStreamParser(model: AgentModel): (chunk: string) => Stream
             (Array.isArray(errors) && errors.length > 0 ? errors[0] : null) ??
             "Process ended with an error";
           events.push({ type: "error", message });
+          continue;
+        }
+
+        // Codex CLI events (from --json JSONL)
+        if (codexExtractor) {
+          const codexEvents = codexExtractor(json);
+          events.push(...codexEvents);
           continue;
         }
 
@@ -70,6 +78,121 @@ export function createStreamParser(model: AgentModel): (chunk: string) => Stream
       }
     }
 
+    return events;
+  };
+}
+
+/**
+ * Create a stateful Codex event extractor.
+ * Tracks cumulative text per item ID to emit only deltas.
+ *
+ * Codex CLI (--json) emits JSONL with these event types:
+ *   thread.started, turn.started, turn.completed, turn.failed, error
+ *   item.started, item.updated, item.completed
+ *
+ * Item types: agent_message, command_execution, file_change,
+ *   mcp_tool_call, reasoning, todo_list, web_search, error
+ */
+function createCodexEventExtractor(): (json: Record<string, unknown>) => StreamEvent[] {
+  const lastTextLengths = new Map<string, number>();
+
+  return (json: Record<string, unknown>): StreamEvent[] => {
+    const events: StreamEvent[] = [];
+    const type = json.type as string;
+
+    // Stream-level error
+    if (type === "error" && typeof json.message === "string") {
+      events.push({ type: "error", message: json.message });
+      return events;
+    }
+
+    // Turn failed
+    if (type === "turn.failed") {
+      const error = json.error as Record<string, unknown> | undefined;
+      const message = typeof error?.message === "string" ? error.message : "Turn failed";
+      events.push({ type: "error", message });
+      return events;
+    }
+
+    // Item events
+    if (type === "item.started" || type === "item.updated" || type === "item.completed") {
+      const item = json.item as Record<string, unknown> | undefined;
+      if (!item) return events;
+
+      const itemType = item.type as string;
+      const itemId = item.id as string;
+
+      // Agent message — incremental text via delta tracking
+      if (itemType === "agent_message" && typeof item.text === "string") {
+        const fullText = item.text;
+        const lastLen = lastTextLengths.get(itemId) ?? 0;
+        if (fullText.length > lastLen) {
+          events.push({ type: "content", text: fullText.slice(lastLen) });
+          lastTextLengths.set(itemId, fullText.length);
+        }
+        return events;
+      }
+
+      // Command execution
+      if (itemType === "command_execution") {
+        if (type === "item.started") {
+          events.push({
+            type: "tool_start",
+            toolId: itemId,
+            toolName: "shell",
+            input: typeof item.command === "string" ? item.command : undefined,
+          });
+        } else if (type === "item.completed") {
+          events.push({
+            type: "tool_result",
+            toolId: itemId,
+            output: typeof item.aggregated_output === "string" ? item.aggregated_output : "",
+          });
+        }
+        return events;
+      }
+
+      // File change
+      if (itemType === "file_change") {
+        if (type === "item.started") {
+          events.push({ type: "tool_start", toolId: itemId, toolName: "file_change" });
+        } else if (type === "item.completed") {
+          const changes = item.changes as Array<Record<string, string>> | undefined;
+          const summary = Array.isArray(changes)
+            ? changes.map((c) => `${c.kind}: ${c.path}`).join("\n")
+            : "";
+          events.push({ type: "tool_result", toolId: itemId, output: summary });
+        }
+        return events;
+      }
+
+      // MCP tool call
+      if (itemType === "mcp_tool_call") {
+        if (type === "item.started") {
+          const toolName = typeof item.tool === "string" ? item.tool : "mcp_tool";
+          const input = item.arguments ? JSON.stringify(item.arguments) : undefined;
+          events.push({ type: "tool_start", toolId: itemId, toolName, input });
+        } else if (type === "item.completed") {
+          const error = item.error as Record<string, unknown> | undefined;
+          if (error && typeof error.message === "string") {
+            events.push({ type: "tool_result", toolId: itemId, output: `Error: ${error.message}` });
+          } else {
+            const result = item.result as Record<string, unknown> | undefined;
+            const output = result ? JSON.stringify(result) : "";
+            events.push({ type: "tool_result", toolId: itemId, output });
+          }
+        }
+        return events;
+      }
+
+      // Error item
+      if (itemType === "error" && typeof item.message === "string") {
+        events.push({ type: "error", message: item.message });
+        return events;
+      }
+    }
+
+    // Skip: thread.started, turn.started, turn.completed, reasoning, todo_list, web_search, collab_tool_call
     return events;
   };
 }
