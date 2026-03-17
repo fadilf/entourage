@@ -4,10 +4,6 @@ import { ENTOURAGE_DIR, THREADS_DIR } from "./config";
 import { Thread, Message, ThreadWithMessages, ThreadListItem, Agent } from "./types";
 import { getProcessManager } from "./process-manager";
 
-function getWorkingDirectory(): string {
-  return process.env.ENTOURAGE_PROJECT_DIR || process.cwd();
-}
-
 function getThreadsDir(workspaceDir: string): string {
   return path.join(workspaceDir, ENTOURAGE_DIR, THREADS_DIR);
 }
@@ -281,4 +277,3 @@ function generateId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export { getWorkingDirectory };

@@ -19,7 +19,6 @@ if (pIdx !== -1 && args[pIdx + 1]) {
 }
 
 const packageDir = path.resolve(__dirname, "..");
-const projectDir = process.cwd();
 
 // Check if .next build exists; if not, build first
 const dotNextDir = path.join(packageDir, ".next");
@@ -29,15 +28,10 @@ if (!fs.existsSync(dotNextDir)) {
 }
 
 console.log(`Starting Entourage on http://localhost:${port}`);
-console.log(`Project directory: ${projectDir}`);
 
 const child = spawn("npx", ["next", "start", "-p", String(port)], {
   cwd: packageDir,
   stdio: "inherit",
-  env: {
-    ...process.env,
-    ENTOURAGE_PROJECT_DIR: projectDir,
-  },
 });
 
 child.on("exit", (code) => {

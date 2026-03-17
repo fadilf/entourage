@@ -33,7 +33,7 @@ Browser → API Routes → ProcessManager (singleton) → CLI subprocesses (clau
 - **Agent personality:** Claude uses `--append-system-prompt`, Gemini prepends `[System Instructions]` to prompt
 - **SSE streaming** via POST fetch + ReadableStream reader (`useAgentStream` hook)
 - **@mentions** parsed to route messages to specific agents; falls back to first agent
-- **Workspaces** map to local project directories; resolved via `?workspaceId` query param, `ENTOURAGE_PROJECT_DIR`, or `cwd()`
+- **Workspaces** map to local project directories; resolved via `?workspaceId` query param
 - **Voice input** via Web Speech API (`useVoiceInput` hook) with interim text and auto-restart
 
 ### Design conventions
@@ -42,7 +42,3 @@ Browser → API Routes → ProcessManager (singleton) → CLI subprocesses (clau
 - Agent avatars: white circle with colored border, model SVG or custom icon inside
 - Fonts: Geist Sans + Geist Mono via `next/font/google`
 - Modals: `fixed inset-0 z-50 bg-black/40` overlay
-
-### Environment
-
-- `ENTOURAGE_PROJECT_DIR` — Working directory for CLI subprocesses (defaults to `process.cwd()`)

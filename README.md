@@ -35,10 +35,6 @@ npm run dev
 
 Open [http://localhost:5555](http://localhost:5555) to start chatting.
 
-### Environment
-
-- `ENTOURAGE_PROJECT_DIR` — Working directory for CLI subprocesses (defaults to `process.cwd()`)
-
 ## Stack
 
 Next.js (App Router), React, TypeScript, Tailwind CSS
