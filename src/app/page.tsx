@@ -310,6 +310,22 @@ export default function Home() {
     [refetchThreads, selectedThreadId, wsUrl]
   );
 
+  const handleRewind = useCallback(
+    async (messageId: string) => {
+      if (!selectedThreadId) return;
+      const res = await fetch(wsUrl(`/api/threads/${selectedThreadId}/rewind`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId }),
+      });
+      if (!res.ok) return;
+      const updated = await res.json();
+      setSelectedThread(updated);
+      refetchThreads();
+    },
+    [selectedThreadId, setSelectedThread, refetchThreads, wsUrl]
+  );
+
   const handleThreadCreated = useCallback(
     (thread: ThreadWithMessages) => {
       refetchThreads();
@@ -339,6 +355,7 @@ export default function Home() {
       onSendMessage={handleSendMessage}
       onStop={stopAgent}
       onRenameThread={handleRenameThread}
+      onRewind={handleRewind}
       isStreaming={isStreaming}
       allAgents={agents}
       displayName={displayName}

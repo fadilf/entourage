@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ThreadWithMessages, Agent, Message, MessageImage } from "@/lib/types";
-import { ChevronLeft, Pencil } from "lucide-react";
+import { ChevronLeft, Pencil, RotateCcw } from "lucide-react";
 import MessageList from "./MessageList";
 import ModelIcon from "./ModelIcon";
 import MessageInput from "./MessageInput";
+import ContextMenu from "./ContextMenu";
 
 export default function ThreadDetail({
   thread,
@@ -18,6 +19,7 @@ export default function ThreadDetail({
   displayName,
   isMobile,
   onBack,
+  onRewind,
 }: {
   thread: ThreadWithMessages | null;
   streamingMessages: Map<string, { agentId: string; content: string; toolCalls?: import("@/lib/types").ToolCall[]; contentBlocks?: import("@/lib/types").ContentBlock[] }>;
@@ -29,12 +31,15 @@ export default function ThreadDetail({
   displayName?: string;
   isMobile?: boolean;
   onBack?: () => void;
+  onRewind?: (messageId: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const [rewindMenu, setRewindMenu] = useState<{ x: number; y: number; messageId: string } | null>(null);
+  const [rewindConfirm, setRewindConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -58,6 +63,11 @@ export default function ThreadDetail({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [thread?.messages.length, streamingContentKey]);
+
+  const handleRewindRequest = useCallback((messageId: string, x: number, y: number) => {
+    if (isStreaming) return;
+    setRewindMenu({ x, y, messageId });
+  }, [isStreaming]);
 
   if (!thread) {
     return (
@@ -168,6 +178,7 @@ export default function ThreadDetail({
           messages={allMessages}
           agents={thread.agents}
           displayName={displayName}
+          onRewind={handleRewindRequest}
         />
       </div>
       <MessageInput
@@ -179,6 +190,47 @@ export default function ThreadDetail({
         disabled={isStreaming}
         isMobile={isMobile}
       />
+      {rewindMenu && (
+        <ContextMenu
+          x={rewindMenu.x}
+          y={rewindMenu.y}
+          onClose={() => setRewindMenu(null)}
+          items={[
+            {
+              label: "Rewind to here",
+              icon: <RotateCcw className="h-4 w-4" />,
+              onClick: () => setRewindConfirm(rewindMenu.messageId),
+            },
+          ]}
+        />
+      )}
+      {rewindConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="mx-4 w-full max-w-sm rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6 shadow-xl">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Rewind conversation?</h3>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              Messages after this point will be permanently deleted.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setRewindConfirm(null)}
+                className="rounded-lg px-3 py-1.5 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onRewind?.(rewindConfirm);
+                  setRewindConfirm(null);
+                }}
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Rewind
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
