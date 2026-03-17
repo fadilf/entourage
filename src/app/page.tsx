@@ -381,7 +381,7 @@ export default function Home() {
     />
   );
 
-  const handleWorkspaceAdded = useCallback((ws: { id: string; name: string; directory: string; color: string; addedAt: string }) => {
+  const handleWorkspaceAdded = useCallback((ws: Workspace) => {
     setWorkspaces((prev) => [...prev, ws]);
     setActiveWorkspaceId(ws.id);
     setSelectedThreadId(null);

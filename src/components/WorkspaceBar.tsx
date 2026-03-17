@@ -29,6 +29,7 @@ export default function WorkspaceBar({
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
+  const [iconPickerTop, setIconPickerTop] = useState(100);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const iconPickerRef = useRef<HTMLDivElement>(null);
@@ -60,6 +61,11 @@ export default function WorkspaceBar({
       }
     };
     if (iconPickerFor) {
+      const btn = wsButtonRefs.current.get(iconPickerFor);
+      if (btn) {
+        const rect = btn.getBoundingClientRect();
+        setIconPickerTop(Math.min(rect.top, window.innerHeight - 350));
+      }
       document.addEventListener("mousedown", handleClick);
       return () => document.removeEventListener("mousedown", handleClick);
     }
@@ -223,12 +229,7 @@ export default function WorkspaceBar({
           className="fixed z-50 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl p-3 w-72"
           style={{
             left: 72,
-            top: (() => {
-              const btn = wsButtonRefs.current.get(iconPickerFor);
-              if (!btn) return 100;
-              const rect = btn.getBoundingClientRect();
-              return Math.min(rect.top, window.innerHeight - 350);
-            })(),
+            top: iconPickerTop,
           }}
         >
           <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">Workspace Icon</div>
