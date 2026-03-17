@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
-import { ThreadListItem, ThreadWithMessages, ThreadProcess, Agent, MessageImage, Workspace } from "@/lib/types";
+import { ThreadListItem, ThreadWithMessages, ThreadProcess, Agent, MessageImage, Workspace, Icon } from "@/lib/types";
 import { useAgentStream } from "@/hooks/useSSE";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import ThreadList from "@/components/ThreadList";
@@ -214,6 +214,7 @@ export default function Home() {
 
   // Poll statuses
   useEffect(() => {
+    if (!activeWorkspaceId) return;
     const poll = () => {
       fetch(wsUrl("/api/threads/status"))
         .then((r) => r.json())
@@ -226,7 +227,7 @@ export default function Home() {
     poll();
     const interval = setInterval(poll, 2500);
     return () => clearInterval(interval);
-  }, [wsUrl]);
+  }, [activeWorkspaceId, wsUrl]);
 
   // Switch workspace handler
   const handleSelectWorkspace = useCallback((id: string) => {
@@ -251,7 +252,7 @@ export default function Home() {
   );
 
   const handleEditWorkspace = useCallback(
-    async (id: string, updates: { name?: string; color?: string }) => {
+    async (id: string, updates: { name?: string; color?: string; icon?: Icon | null }) => {
       const res = await fetch(`/api/workspaces/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

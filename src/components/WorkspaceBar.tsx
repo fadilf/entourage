@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Pencil, Trash2, FolderOpen, Settings } from "lucide-react";
-import { Workspace } from "@/lib/types";
+import { Plus, Pencil, Trash2, FolderOpen, Settings, Palette } from "lucide-react";
+import { Workspace, Icon } from "@/lib/types";
+import IconPicker, { renderIcon } from "./IconPicker";
 
 type Props = {
   workspaces: Workspace[];
@@ -11,7 +12,7 @@ type Props = {
   onSelectWorkspace: (id: string) => void;
   onAddWorkspace: () => void;
   onRemoveWorkspace: (id: string) => void;
-  onEditWorkspace: (id: string, updates: { name?: string; color?: string }) => void;
+  onEditWorkspace: (id: string, updates: { name?: string; color?: string; icon?: Icon | null }) => void;
   onOpenSettings: () => void;
 };
 
@@ -27,8 +28,11 @@ export default function WorkspaceBar({
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const iconPickerRef = useRef<HTMLDivElement>(null);
+  const wsButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -48,6 +52,18 @@ export default function WorkspaceBar({
       return () => document.removeEventListener("mousedown", handleClick);
     }
   }, [contextMenu]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (iconPickerRef.current && !iconPickerRef.current.contains(e.target as Node)) {
+        setIconPickerFor(null);
+      }
+    };
+    if (iconPickerFor) {
+      document.addEventListener("mousedown", handleClick);
+      return () => document.removeEventListener("mousedown", handleClick);
+    }
+  }, [iconPickerFor]);
 
   const handleContextMenu = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -106,6 +122,7 @@ export default function WorkspaceBar({
               />
             ) : (
               <button
+                ref={(el) => { if (el) wsButtonRefs.current.set(ws.id, el); }}
                 onClick={() => onSelectWorkspace(ws.id)}
                 onContextMenu={(e) => handleContextMenu(e, ws.id)}
                 className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold text-white ml-3 transition-all duration-200 ${
@@ -116,7 +133,7 @@ export default function WorkspaceBar({
                 style={{ backgroundColor: ws.color }}
                 title={`${ws.name}\n${ws.directory}`}
               >
-                {getInitials(ws.name)}
+                {ws.icon ? renderIcon(ws.icon, "h-5 w-5") : getInitials(ws.name)}
               </button>
             )}
           </div>
@@ -160,6 +177,28 @@ export default function WorkspaceBar({
             className="w-full px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 flex items-center gap-2 text-left"
             onClick={() => {
               setContextMenu(null);
+              setIconPickerFor(contextMenu.id);
+            }}
+          >
+            <Palette size={14} />
+            Change Icon
+          </button>
+          {workspaces.find((w) => w.id === contextMenu.id)?.icon && (
+            <button
+              className="w-full px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 flex items-center gap-2 text-left"
+              onClick={() => {
+                onEditWorkspace(contextMenu.id, { icon: null });
+                setContextMenu(null);
+              }}
+            >
+              <Trash2 size={14} />
+              Remove Icon
+            </button>
+          )}
+          <button
+            className="w-full px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 flex items-center gap-2 text-left"
+            onClick={() => {
+              setContextMenu(null);
             }}
           >
             <FolderOpen size={14} />
@@ -175,6 +214,32 @@ export default function WorkspaceBar({
             <Trash2 size={14} />
             Remove
           </button>
+        </div>,
+        document.body
+      )}
+      {iconPickerFor && createPortal(
+        <div
+          ref={iconPickerRef}
+          className="fixed z-50 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl p-3 w-72"
+          style={{
+            left: 72,
+            top: (() => {
+              const btn = wsButtonRefs.current.get(iconPickerFor);
+              if (!btn) return 100;
+              const rect = btn.getBoundingClientRect();
+              return Math.min(rect.top, window.innerHeight - 350);
+            })(),
+          }}
+        >
+          <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">Workspace Icon</div>
+          <IconPicker
+            value={workspaces.find((w) => w.id === iconPickerFor)?.icon}
+            onChange={(icon) => {
+              onEditWorkspace(iconPickerFor, { icon });
+              setIconPickerFor(null);
+            }}
+            enableUpload
+          />
         </div>,
         document.body
       )}
