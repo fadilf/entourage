@@ -3,6 +3,7 @@ import { ThreadListItem, ThreadProcess } from "@/lib/types";
 import ModelIcon from "./ModelIcon";
 import AgentStatusBadge from "./AgentStatusBadge";
 import ContextMenu from "./ContextMenu";
+import Logo from "@/components/Logo";
 import { Settings, Archive, ArchiveRestore, ChevronRight, MoreHorizontal } from "lucide-react";
 
 function formatDate(timestamp: string) {
@@ -203,7 +204,7 @@ export default function ThreadList({
     <div className="flex h-full w-full flex-col border-r border-zinc-200 dark:border-zinc-700">
       <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700 px-5 py-4">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Entourage" className="h-7 w-7" />
+          <Logo className="h-7 w-7" />
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Entourage</h1>
         </div>
         <div className="flex items-center gap-2">
