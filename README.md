@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logo.png" alt="Entourage" width="128" />
+  <img src="public/logo-light.svg" alt="Entourage" width="128" />
 </p>
 
 # Entourage
@@ -26,14 +26,34 @@ Create custom agent profiles with distinct names, icons, colors, and personality
 - Node.js 18+
 - At least one CLI installed: [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) or [Gemini CLI](https://github.com/google-gemini/gemini-cli)
 
-### Setup
+### Quick Start
+
+```bash
+cd ~/my-project
+npx entourage
+```
+
+Open [http://localhost:5555](http://localhost:5555) to start chatting.
+
+#### CLI Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--port`, `-p` | Port to serve on | `5555` |
+| `--host`, `-H` | Host to bind to | `localhost` |
+
+```bash
+npx entourage -p 8080              # custom port
+npx entourage -H 0.0.0.0           # expose to network
+npx entourage -H 0.0.0.0 -p 8080  # both
+```
+
+### Development
 
 ```bash
 npm install
 npm run dev
 ```
-
-Open [http://localhost:5555](http://localhost:5555) to start chatting.
 
 ## Stack
 
