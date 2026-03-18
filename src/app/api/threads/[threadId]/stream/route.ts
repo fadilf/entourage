@@ -253,6 +253,7 @@ export async function POST(
               status,
               ...(accumulatedToolCalls.length > 0 ? { toolCalls: accumulatedToolCalls } : {}),
               ...(accumulatedBlocks.length > 0 ? { contentBlocks: accumulatedBlocks } : {}),
+              ...(inlineSuggestions.length > 0 ? { suggestions: inlineSuggestions } : {}),
             }).catch(() => {});
 
             try {

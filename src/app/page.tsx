@@ -268,12 +268,19 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedThread?.id, reattach]);
 
-  // Clear suggestions on thread switch
+  // Restore persisted suggestions on thread switch (or clear if none)
   useEffect(() => {
     suggestionsAbortRef.current?.abort();
-    setSuggestions([]);
     setSuggestionsLoading(false);
-  }, [selectedThreadId]);
+    if (selectedThread) {
+      const lastAssistant = [...selectedThread.messages]
+        .reverse()
+        .find((m) => m.role === "assistant" && m.status === "complete");
+      setSuggestions(lastAssistant?.suggestions ?? []);
+    } else {
+      setSuggestions([]);
+    }
+  }, [selectedThreadId, selectedThread]);
 
   const handleDraftChange = useCallback((hasText: boolean) => {
     if (hasText) {
@@ -487,6 +494,7 @@ export default function Home() {
       statuses={statuses}
       unreadByThread={unreadByThread}
       isMobile={isMobile}
+      workspaceName={workspaces.find(w => w.id === activeWorkspaceId)?.name}
     />
   );
 

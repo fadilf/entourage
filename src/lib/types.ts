@@ -54,6 +54,7 @@ export type Message = {
   images?: MessageImage[];
   toolCalls?: ToolCall[];
   contentBlocks?: ContentBlock[];
+  suggestions?: string[];
   isReattach?: boolean;
 };
 
