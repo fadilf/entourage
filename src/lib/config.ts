@@ -9,7 +9,7 @@ export function getUploadsDir(workspaceDir?: string): string {
   return path.join(workspaceDir || process.cwd(), ENTOURAGE_DIR, UPLOADS_DIR);
 }
 
-export const DEFAULT_AGENT_IDS = ["claude", "gemini", "codex"];
+export const DEFAULT_AGENT_IDS = ["claude", "gemini", "codex", "opencode"];
 
 export const DEFAULT_AGENTS: Agent[] = [
   {
@@ -31,6 +31,13 @@ export const DEFAULT_AGENTS: Agent[] = [
     name: "Codex",
     model: "codex",
     avatarColor: "#10a37f",
+    isDefault: true,
+  },
+  {
+    id: "opencode",
+    name: "OpenCode",
+    model: "opencode",
+    avatarColor: "#6366f1",
     isDefault: true,
   },
 ];
@@ -78,6 +85,24 @@ export function getCliCommand(model: string, prompt: string, sessionId: string, 
     args.push(effectivePrompt);
 
     return { cmd: "codex", args };
+  }
+
+  if (model === "opencode") {
+    let effectivePrompt = fullPrompt;
+    if (personality) {
+      effectivePrompt = `[System Instructions]\n${personality}\n[End System Instructions]\n\n${effectivePrompt}`;
+    }
+    const args = ["run", "--format", "json"];
+    if (isResume) {
+      args.push("--session", sessionId);
+    }
+    if (hasImages) {
+      for (const p of imagePaths) {
+        args.push("-f", p);
+      }
+    }
+    args.push(effectivePrompt);
+    return { cmd: "opencode", args };
   }
 
   // Gemini: no --system-instruction flag, prepend to prompt
