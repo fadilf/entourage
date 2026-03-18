@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ThreadWithMessages, Agent, Message, MessageImage } from "@/lib/types";
 import { ChevronLeft, Copy, Pencil, RotateCcw } from "lucide-react";
+import Dialog from "./Dialog";
 import MessageList from "./MessageList";
 import ModelIcon from "./ModelIcon";
 import MessageInput from "./MessageInput";
@@ -232,7 +233,7 @@ export default function ThreadDetail({
         />
       )}
       {rewindConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <Dialog open={!!rewindConfirm} onClose={() => setRewindConfirm(null)}>
           <div className="mx-4 w-full max-w-sm rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6 shadow-xl">
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Rewind conversation?</h3>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
@@ -256,7 +257,7 @@ export default function ThreadDetail({
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

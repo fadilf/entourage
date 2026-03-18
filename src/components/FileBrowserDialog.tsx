@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { FolderOpen, ChevronRight } from "lucide-react";
+import Dialog from "./Dialog";
 import FileTree from "./FileTree";
 import FilePreview from "./FilePreview";
 
@@ -45,15 +46,6 @@ export default function FileBrowserDialog({
     }
   }, [open]);
 
-  // Escape key to close
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open, onClose]);
 
   const handleSelectFile = useCallback(
     async (filePath: string) => {
@@ -101,17 +93,10 @@ export default function FileBrowserDialog({
     [workspaceId]
   );
 
-  if (!open) return null;
-
   const pathSegments = selectedPath?.split("/") ?? [];
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <Dialog open={open} onClose={onClose}>
       <div
         className="flex w-full max-w-4xl flex-col rounded-xl bg-white dark:bg-zinc-800 shadow-xl mx-4"
         style={{ height: "70vh", maxHeight: 600 }}
@@ -175,6 +160,6 @@ export default function FileBrowserDialog({
           </div>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

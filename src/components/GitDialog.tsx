@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { GitBranch, ArrowDown, ArrowUp } from "lucide-react";
 import { GitStatus } from "@/lib/types";
+import Dialog from "./Dialog";
 import GitFileList from "./GitFileList";
 import GitDiffViewer from "./GitDiffViewer";
 
@@ -157,18 +158,13 @@ export default function GitDialog({
     }
   };
 
-  if (!open) return null;
-
   const totalChanges = (status?.staged.length ?? 0) + (status?.unstaged.length ?? 0);
   const selectedFileStatus = selectedFile
     ? [...(status?.staged ?? []), ...(status?.unstaged ?? [])].find((f) => f.path === selectedFile)?.status ?? null
     : null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+    <Dialog open={open} onClose={onClose}>
       <div className="flex w-full max-w-4xl flex-col rounded-xl bg-white dark:bg-zinc-800 shadow-xl mx-4" style={{ height: "70vh", maxHeight: 600 }}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700 px-5 py-3">
@@ -255,6 +251,6 @@ export default function GitDialog({
           </div>
         )}
       </div>
-    </div>
+    </Dialog>
   );
 }

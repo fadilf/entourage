@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
+import Dialog from "./Dialog";
 import DirectoryBrowser from "./DirectoryBrowser";
 import { Workspace, Icon } from "@/lib/types";
 import IconPicker, { renderIcon } from "./IconPicker";
@@ -29,7 +30,6 @@ export default function AddWorkspaceDialog({ open, onClose, onAdded, inline }: P
     return name.slice(0, 2).toUpperCase();
   };
 
-  if (!open && !inline) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,6 +187,7 @@ export default function AddWorkspaceDialog({ open, onClose, onAdded, inline }: P
   );
 
   if (inline) {
+    if (!open) return null;
     return (
       <div className="flex-1 flex items-center justify-center bg-zinc-50 dark:bg-zinc-900">
         {formContent}
@@ -195,11 +196,8 @@ export default function AddWorkspaceDialog({ open, onClose, onAdded, inline }: P
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+    <Dialog open={open} onClose={onClose}>
       {formContent}
-    </div>
+    </Dialog>
   );
 }

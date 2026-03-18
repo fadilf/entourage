@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Agent, ThreadWithMessages } from "@/lib/types";
+import Dialog from "./Dialog";
 import ModelIcon from "./ModelIcon";
 
 export default function NewThreadDialog({
@@ -20,8 +21,6 @@ export default function NewThreadDialog({
   const [title, setTitle] = useState("");
   const [selectedAgentId, setSelectedAgentId] = useState<string>(agents[0]?.id ?? "");
   const [creating, setCreating] = useState(false);
-
-  if (!open) return null;
 
   const handleCreate = async () => {
     if (!title.trim() || !selectedAgentId) return;
@@ -45,7 +44,7 @@ export default function NewThreadDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <Dialog open={open} onClose={onClose}>
       <div className="w-full max-w-md rounded-xl bg-white dark:bg-zinc-800 p-4 md:p-6 shadow-xl mx-4">
         <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">New Thread</h3>
 
@@ -114,6 +113,6 @@ export default function NewThreadDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Agent, AgentModel, Icon } from "@/lib/types";
 import { PLUGINS } from "@/lib/plugins";
+import Dialog from "./Dialog";
 import ModelIcon from "./ModelIcon";
 import IconPicker from "./IconPicker";
 import { ArrowLeft, GripVertical, Pencil, Trash2, Sun, Moon } from "lucide-react";
@@ -94,8 +95,6 @@ export default function SettingsDialog({
     }
   };
 
-  if (!open) return null;
-
   const showForm = editingAgent !== null || isCreating;
 
   const startCreate = () => {
@@ -184,7 +183,7 @@ export default function SettingsDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <Dialog open={open} onClose={onClose}>
       <div className="flex w-full max-w-2xl flex-col rounded-xl bg-white dark:bg-zinc-800 shadow-xl mx-4" style={{ maxHeight: "85vh" }}>
         {/* Header */}
         <div className="border-b border-zinc-200 dark:border-zinc-700 px-4 md:px-6">
@@ -556,6 +555,6 @@ export default function SettingsDialog({
           ) : null}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

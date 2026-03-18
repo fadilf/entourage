@@ -117,40 +117,37 @@ export default function WorkspaceBar({
 
       {/* Plugin icons */}
       {enabledPlugins.includes("git") && (
-        <>
-          <button
-            onClick={() => onPluginClick?.("git")}
-            disabled={!gitIsRepo}
-            className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors ml-3 ${
-              gitIsRepo
-                ? "text-zinc-400 hover:text-white hover:bg-zinc-700"
-                : "text-zinc-600 cursor-not-allowed"
-            }`}
-            title={gitIsRepo ? "Source Control" : "Not a git repository"}
-          >
-            <GitBranch size={20} />
-            {gitChangeCount > 0 && gitIsRepo && (
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-500 px-1 text-[10px] font-medium text-white">
-                {gitChangeCount > 99 ? "99+" : gitChangeCount}
-              </span>
-            )}
-          </button>
-          <div className="w-8 h-px bg-zinc-700 my-1" />
-        </>
+        <button
+          onClick={() => onPluginClick?.("git")}
+          disabled={!gitIsRepo}
+          className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors ml-3 ${
+            gitIsRepo
+              ? "text-zinc-400 hover:text-white hover:bg-zinc-700"
+              : "text-zinc-600 cursor-not-allowed"
+          }`}
+          title={gitIsRepo ? "Source Control" : "Not a git repository"}
+        >
+          <GitBranch size={20} />
+          {gitChangeCount > 0 && gitIsRepo && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-500 px-1 text-[10px] font-medium text-white">
+              {gitChangeCount > 99 ? "99+" : gitChangeCount}
+            </span>
+          )}
+        </button>
       )}
 
       {enabledPlugins.includes("files") && (
-        <>
-          <button
-            onClick={() => onPluginClick?.("files")}
-            className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors ml-3 text-zinc-400 hover:text-white hover:bg-zinc-700"
-            title="File Browser"
-          >
-            <FolderOpen size={20} />
-          </button>
-          <div className="w-8 h-px bg-zinc-700 my-1" />
-        </>
+        <button
+          onClick={() => onPluginClick?.("files")}
+          className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors ml-3 text-zinc-400 hover:text-white hover:bg-zinc-700"
+          title="File Browser"
+        >
+          <FolderOpen size={20} />
+        </button>
       )}
+
+      {/* Separator */}
+      <div className="w-8 h-px bg-zinc-700 my-1" />
 
       {workspaces.map((ws) => {
         const isActive = ws.id === activeWorkspaceId;
