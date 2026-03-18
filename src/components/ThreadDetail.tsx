@@ -6,6 +6,7 @@ import { ChevronLeft, Copy, Pencil, RotateCcw } from "lucide-react";
 import MessageList from "./MessageList";
 import ModelIcon from "./ModelIcon";
 import MessageInput from "./MessageInput";
+import QuickReplies from "./QuickReplies";
 import ContextMenu from "./ContextMenu";
 
 export default function ThreadDetail({
@@ -20,6 +21,10 @@ export default function ThreadDetail({
   isMobile,
   onBack,
   onRewind,
+  suggestions,
+  suggestionsLoading,
+  onSuggestionSelect,
+  onDraftChange,
 }: {
   thread: ThreadWithMessages | null;
   streamingMessages: Map<string, { agentId: string; content: string; toolCalls?: import("@/lib/types").ToolCall[]; contentBlocks?: import("@/lib/types").ContentBlock[]; isReattach?: boolean }>;
@@ -32,6 +37,10 @@ export default function ThreadDetail({
   isMobile?: boolean;
   onBack?: () => void;
   onRewind?: (messageId: string) => void;
+  suggestions?: string[];
+  suggestionsLoading?: boolean;
+  onSuggestionSelect?: (text: string) => void;
+  onDraftChange?: (hasText: boolean) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
@@ -186,6 +195,11 @@ export default function ThreadDetail({
           onContextMenu={handleContextMenu}
         />
       </div>
+      <QuickReplies
+        suggestions={suggestions ?? []}
+        loading={suggestionsLoading ?? false}
+        onSelect={(text) => onSuggestionSelect?.(text)}
+      />
       <MessageInput
         key={thread.id}
         agents={thread.agents}
@@ -194,6 +208,7 @@ export default function ThreadDetail({
         onStop={onStop}
         disabled={isStreaming}
         isMobile={isMobile}
+        onDraftChange={onDraftChange}
       />
       {contextMenu && (
         <ContextMenu
