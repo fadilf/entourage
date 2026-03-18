@@ -7,6 +7,12 @@ export const PLUGINS: Plugin[] = [
     icon: "GitBranch",
     enabledByDefault: false,
   },
+  {
+    id: "files",
+    name: "File Browser",
+    icon: "FolderOpen",
+    enabledByDefault: false,
+  },
 ];
 
 export function mapGitStatus(code: string): GitFileEntry["status"] {

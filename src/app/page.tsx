@@ -11,6 +11,7 @@ import SettingsDialog from "@/components/SettingsDialog";
 import WorkspaceBar from "@/components/WorkspaceBar";
 import AddWorkspaceDialog from "@/components/AddWorkspaceDialog";
 import GitDialog from "@/components/GitDialog";
+import FileBrowserDialog from "@/components/FileBrowserDialog";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { PLUGINS } from "@/lib/plugins";
 
@@ -75,6 +76,7 @@ export default function Home() {
   const [showNewThread, setShowNewThread] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showGitDialog, setShowGitDialog] = useState(false);
+  const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [enabledPlugins, setEnabledPlugins] = useState<string[]>([]);
   const [gitChangeCount, setGitChangeCount] = useState(0);
   const [gitIsRepo, setGitIsRepo] = useState(true);
@@ -326,6 +328,7 @@ export default function Home() {
 
   const handlePluginClick = useCallback((pluginId: string) => {
     if (pluginId === "git") setShowGitDialog(true);
+    if (pluginId === "files") setShowFileBrowser(true);
   }, []);
 
   const handleRemoveWorkspace = useCallback(
@@ -575,6 +578,11 @@ export default function Home() {
           setShowGitDialog(false);
           fetchGitBadge();
         }}
+        workspaceId={activeWorkspaceId}
+      />
+      <FileBrowserDialog
+        open={showFileBrowser}
+        onClose={() => setShowFileBrowser(false)}
         workspaceId={activeWorkspaceId}
       />
     </div>

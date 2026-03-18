@@ -139,6 +139,19 @@ export default function WorkspaceBar({
         </>
       )}
 
+      {enabledPlugins.includes("files") && (
+        <>
+          <button
+            onClick={() => onPluginClick?.("files")}
+            className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors ml-3 text-zinc-400 hover:text-white hover:bg-zinc-700"
+            title="File Browser"
+          >
+            <FolderOpen size={20} />
+          </button>
+          <div className="w-8 h-px bg-zinc-700 my-1" />
+        </>
+      )}
+
       {workspaces.map((ws) => {
         const isActive = ws.id === activeWorkspaceId;
         return (
