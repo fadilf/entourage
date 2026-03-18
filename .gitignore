@@ -28,6 +28,8 @@
 # app data
 .nexus
 .entourage
+.superpowers/
+docs/superpowers/
 
 # debug
 npm-debug.log*
