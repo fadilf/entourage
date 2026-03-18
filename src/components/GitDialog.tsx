@@ -17,7 +17,7 @@ export default function GitDialog({
 }) {
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [selectedStaged, setSelectedStaged] = useState(false);
+  const [, setSelectedStaged] = useState(false);
   const [diff, setDiff] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState("");
   const [committing, setCommitting] = useState(false);
