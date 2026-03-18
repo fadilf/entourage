@@ -213,6 +213,13 @@ export default function Home() {
     }
   }, []);
 
+  const handleInlineSuggestions = useCallback((inlineSuggestions: string[]) => {
+    if (inlineSuggestions.length > 0) {
+      setSuggestions(inlineSuggestions);
+      setSuggestionsLoading(false);
+    }
+  }, []);
+
   const handleStreamComplete = useCallback(
     (completedThreadId: string) => {
       streamCompleteThreadId.current = completedThreadId;
@@ -221,17 +228,19 @@ export default function Home() {
       if (completedThreadId === selectedThreadId) {
         refetchThread();
       }
-      if (activeWorkspaceId) {
+      // Only fetch suggestions via separate API if no inline suggestions arrived
+      if (suggestions.length === 0 && activeWorkspaceId) {
         fetchSuggestions(completedThreadId, activeWorkspaceId);
       }
     },
-    [selectedThreadId, refetchThread, refetchThreads, activeWorkspaceId, fetchSuggestions]
+    [selectedThreadId, refetchThread, refetchThreads, activeWorkspaceId, fetchSuggestions, suggestions.length]
   );
 
   const { streamingMessages, isStreaming, sendMessage, stopAgent, reattach } = useAgentStream(
     selectedThreadId,
     handleStreamComplete,
-    activeWorkspaceId
+    activeWorkspaceId,
+    handleInlineSuggestions
   );
 
   // When switching to a thread that just completed streaming, refetch its data

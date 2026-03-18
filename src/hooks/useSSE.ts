@@ -14,7 +14,8 @@ type StreamingMessage = {
 export function useAgentStream(
   threadId: string | null,
   onStreamComplete?: (threadId: string) => void,
-  workspaceId?: string | null
+  workspaceId?: string | null,
+  onInlineSuggestions?: (suggestions: string[]) => void
 ) {
   // Store streams for ALL threads in a ref so they persist across threadId changes
   const allStreams = useRef<Map<string, Map<string, StreamingMessage>>>(
@@ -25,6 +26,8 @@ export function useAgentStream(
   const [error, setError] = useState<string | null>(null);
   const onCompleteRef = useRef(onStreamComplete);
   onCompleteRef.current = onStreamComplete;
+  const onSuggestionsRef = useRef(onInlineSuggestions);
+  onSuggestionsRef.current = onInlineSuggestions;
   const workspaceIdRef = useRef(workspaceId);
   workspaceIdRef.current = workspaceId;
 
@@ -147,6 +150,8 @@ export function useAgentStream(
                   threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", toolCalls, contentBlocks: blocks });
                   triggerRender();
                 }
+              } else if (event.type === "suggestions") {
+                onSuggestionsRef.current?.(event.suggestions);
               } else if (event.type === "done") {
                 break;
               } else if (event.type === "error") {
@@ -314,6 +319,8 @@ export function useAgentStream(
                   threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", toolCalls, contentBlocks: blocks });
                   triggerRender();
                 }
+              } else if (event.type === "suggestions") {
+                onSuggestionsRef.current?.(event.suggestions);
               } else if (event.type === "done") {
                 break;
               } else if (event.type === "error") {

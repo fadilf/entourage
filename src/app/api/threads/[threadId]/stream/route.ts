@@ -3,8 +3,9 @@ import { getThread, addMessage, updateMessage, addUnreadAgent } from "@/lib/thre
 import { getProcessManager } from "@/lib/process-manager";
 import { createStreamParser } from "@/lib/stream-parser";
 import { AgentModel, MessageImage, ToolCall, ContentBlock } from "@/lib/types";
-import { loadAgents } from "@/lib/agent-store";
+import { loadAgents, loadQuickRepliesConfig } from "@/lib/agent-store";
 import { buildContextualPrompt, buildFullHistoryPrompt } from "@/lib/context";
+import { QUICK_REPLY_INSTRUCTION, parseQuickReplies } from "@/lib/quick-replies";
 import { stripMentions } from "@/lib/mentions";
 import path from "path";
 import { getUploadsDir } from "@/lib/config";
@@ -117,6 +118,13 @@ export async function POST(
     (m) => m.role === "assistant" && m.agentId === agent.id && m.status === "complete"
   );
 
+  // Load quick replies config to append instruction to personality
+  const quickRepliesConfig = await loadQuickRepliesConfig();
+  const quickRepliesEnabled = quickRepliesConfig.enabled;
+  const effectivePersonality = quickRepliesEnabled
+    ? (agent.personality ?? "") + QUICK_REPLY_INSTRUCTION
+    : agent.personality;
+
   const cleanPrompt = stripMentions(prompt, thread.agents);
   const enrichedPrompt = buildContextualPrompt(thread.messages, agent.id, thread.agents, cleanPrompt);
   // Build full history prompt for fallback when --resume fails (session lost)
@@ -222,14 +230,35 @@ export async function POST(
                 tc.status = status === "error" ? "error" : "complete";
               }
             }
+
+            // Parse and strip <QuickReply> tags from content
+            let finalContent = accumulatedContent;
+            let inlineSuggestions: string[] = [];
+            if (quickRepliesEnabled && status === "complete") {
+              const parsed = parseQuickReplies(accumulatedContent);
+              finalContent = parsed.cleaned;
+              inlineSuggestions = parsed.suggestions;
+              // Also clean the last text block
+              if (parsed.suggestions.length > 0) {
+                const lastBlock = accumulatedBlocks[accumulatedBlocks.length - 1];
+                if (lastBlock && lastBlock.type === "text") {
+                  const blockParsed = parseQuickReplies(lastBlock.text);
+                  lastBlock.text = blockParsed.cleaned;
+                }
+              }
+            }
+
             updateMessage(workspaceDir, threadId, assistantMsg.id, {
-              content: accumulatedContent || (status === "error" ? `[Process exited with code ${code}]` : ""),
+              content: finalContent || (status === "error" ? `[Process exited with code ${code}]` : ""),
               status,
               ...(accumulatedToolCalls.length > 0 ? { toolCalls: accumulatedToolCalls } : {}),
               ...(accumulatedBlocks.length > 0 ? { contentBlocks: accumulatedBlocks } : {}),
             }).catch(() => {});
 
             try {
+              if (inlineSuggestions.length > 0) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "suggestions", suggestions: inlineSuggestions })}\n\n`));
+              }
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done", status })}\n\n`));
               controller.close();
             } catch {
@@ -254,7 +283,7 @@ export async function POST(
             }
           },
           hasHistory,
-          agent.personality,
+          effectivePersonality,
           imagePaths.length > 0 ? imagePaths : undefined,
           fullHistoryPrompt
         );
