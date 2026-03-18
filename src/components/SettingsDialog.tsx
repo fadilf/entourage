@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Agent, AgentModel, Icon } from "@/lib/types";
 import ModelIcon from "./ModelIcon";
 import IconPicker from "./IconPicker";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon } from "lucide-react";
+import { ArrowLeft, GripVertical, Pencil, Trash2, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 type AgentFormData = {
@@ -48,6 +48,8 @@ export default function SettingsDialog({
   useEffect(() => setMounted(true), []);
   const [displayName, setDisplayName] = useState("");
   const [savedDisplayName, setSavedDisplayName] = useState("");
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const fetchAgents = useCallback(async () => {
     const res = await fetch(`/api/agents`);
@@ -386,8 +388,33 @@ export default function SettingsDialog({
               {agents.map((agent) => (
                 <div
                   key={agent.id}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                  draggable
+                  onDragStart={() => setDragId(agent.id)}
+                  onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverId(agent.id); }}
+                  onDrop={() => {
+                    if (dragId && dragId !== agent.id) {
+                      const ids = agents.map((a) => a.id);
+                      const fromIdx = ids.indexOf(dragId);
+                      ids.splice(fromIdx, 1);
+                      const toIdx = ids.indexOf(agent.id);
+                      ids.splice(toIdx, 0, dragId);
+                      const reordered = ids.map((id) => agents.find((a) => a.id === id)!);
+                      setAgents(reordered);
+                      fetch("/api/agents/reorder", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ orderedIds: ids }),
+                      });
+                    }
+                    setDragId(null);
+                    setDragOverId(null);
+                  }}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 ${
+                    dragId === agent.id ? "opacity-40" : ""
+                  } ${dragOverId === agent.id && dragId !== agent.id ? "ring-2 ring-violet-500 ring-inset" : ""}`}
                 >
+                  <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-zinc-300 dark:text-zinc-600" />
                   <div
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white dark:bg-zinc-800"
                     style={{

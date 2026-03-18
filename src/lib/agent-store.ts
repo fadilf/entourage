@@ -177,6 +177,18 @@ export async function deleteAgent(id: string): Promise<void> {
   await saveAgents(filtered);
 }
 
+export async function reorderAgents(orderedIds: string[]): Promise<Agent[]> {
+  const agents = await loadAgents();
+  const map = new Map(agents.map((a) => [a.id, a]));
+  const reordered = orderedIds.map((id) => map.get(id)).filter(Boolean) as Agent[];
+  // Append any agents not in the ordered list (shouldn't happen, but safe)
+  for (const a of agents) {
+    if (!orderedIds.includes(a.id)) reordered.push(a);
+  }
+  await saveAgents(reordered);
+  return reordered;
+}
+
 export async function getAgent(id: string): Promise<Agent | null> {
   const agents = await loadAgents();
   return agents.find((a) => a.id === id) ?? null;

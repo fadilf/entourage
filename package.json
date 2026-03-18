@@ -1,5 +1,5 @@
 {
-  "name": "entourage",
+  "name": "@fadilf/entourage",
   "version": "0.1.0",
   "bin": {
     "entourage": "./bin/entourage.js"

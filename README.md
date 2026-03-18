@@ -30,7 +30,7 @@ Create custom agent profiles with distinct names, icons, colors, and personality
 
 ```bash
 cd ~/my-project
-npx entourage
+npx @fadilf/entourage
 ```
 
 Open [http://localhost:5555](http://localhost:5555) to start chatting.
@@ -43,9 +43,9 @@ Open [http://localhost:5555](http://localhost:5555) to start chatting.
 | `--host`, `-H` | Host to bind to | `localhost` |
 
 ```bash
-npx entourage -p 8080              # custom port
-npx entourage -H 0.0.0.0           # expose to network
-npx entourage -H 0.0.0.0 -p 8080  # both
+npx @fadilf/entourage -p 8080              # custom port
+npx @fadilf/entourage -H 0.0.0.0           # expose to network
+npx @fadilf/entourage -H 0.0.0.0 -p 8080  # both
 ```
 
 ### Development

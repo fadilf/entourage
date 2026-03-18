@@ -18,30 +18,24 @@ export default function NewThreadDialog({
   workspaceId?: string | null;
 }) {
   const [title, setTitle] = useState("");
-  const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([agents[0]?.id].filter(Boolean));
+  const [selectedAgentId, setSelectedAgentId] = useState<string>(agents[0]?.id ?? "");
   const [creating, setCreating] = useState(false);
 
   if (!open) return null;
 
-  const toggleAgent = (id: string) => {
-    setSelectedAgentIds((prev) =>
-      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
-    );
-  };
-
   const handleCreate = async () => {
-    if (!title.trim() || !selectedAgentIds.length) return;
+    if (!title.trim() || !selectedAgentId) return;
     setCreating(true);
     try {
       const res = await fetch(`/api/threads${workspaceId ? `?workspaceId=${workspaceId}` : ""}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), agentIds: selectedAgentIds }),
+        body: JSON.stringify({ title: title.trim(), agentIds: [selectedAgentId] }),
       });
       if (res.ok) {
         const thread = await res.json();
         setTitle("");
-        setSelectedAgentIds([agents[0]?.id].filter(Boolean));
+        setSelectedAgentId(agents[0]?.id ?? "");
         onCreated(thread);
         onClose();
       }
@@ -74,14 +68,14 @@ export default function NewThreadDialog({
         </div>
 
         <div className="mt-4">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Agents</label>
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Starting Agent</label>
           <div className="mt-2 flex flex-wrap gap-2">
             {agents.map((agent) => {
-              const selected = selectedAgentIds.includes(agent.id);
+              const selected = selectedAgentId === agent.id;
               return (
                 <button
                   key={agent.id}
-                  onClick={() => toggleAgent(agent.id)}
+                  onClick={() => setSelectedAgentId(agent.id)}
                   className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     selected
                       ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
@@ -113,7 +107,7 @@ export default function NewThreadDialog({
           </button>
           <button
             onClick={handleCreate}
-            disabled={!title.trim() || !selectedAgentIds.length || creating}
+            disabled={!title.trim() || !selectedAgentId || creating}
             className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-sm font-medium text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50"
           >
             {creating ? "Creating..." : "Create"}

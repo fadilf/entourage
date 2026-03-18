@@ -74,7 +74,7 @@ export default function AddWorkspaceDialog({ open, onClose, onAdded, inline }: P
   };
 
   const formContent = (
-    <div className={inline ? "bg-white dark:bg-zinc-800 rounded-xl shadow-2xl w-full max-w-md p-4 md:p-6" : "bg-white dark:bg-zinc-800 rounded-xl shadow-2xl w-full max-w-md p-4 md:p-6 mx-4"}>
+    <div className={inline ? "bg-white dark:bg-zinc-800 rounded-xl shadow-2xl w-full max-w-md p-4 md:p-6" : "bg-white dark:bg-zinc-800 rounded-xl shadow-2xl w-full max-w-md p-4 md:p-6 mx-4 max-h-[85vh] flex flex-col"}>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add Workspace</h2>
         {!inline && (
@@ -84,7 +84,7 @@ export default function AddWorkspaceDialog({ open, onClose, onAdded, inline }: P
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 min-h-0">
         <div>
           <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
             Project Directory
