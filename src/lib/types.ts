@@ -79,3 +79,22 @@ export type Workspace = {
   addedAt: string;
   icon?: Icon;
 };
+
+export type Plugin = {
+  id: string;
+  name: string;
+  icon: string;
+  enabledByDefault: boolean;
+};
+
+export type GitFileEntry = {
+  path: string;
+  status: "modified" | "added" | "deleted" | "renamed" | "untracked";
+};
+
+export type GitStatus = {
+  isRepo: boolean;
+  branch: string;
+  staged: GitFileEntry[];
+  unstaged: GitFileEntry[];
+};
