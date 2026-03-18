@@ -1,4 +1,4 @@
-import { execFile } from "child_process";
+import { spawn } from "child_process";
 import { Agent } from "./types";
 
 const PROMPT_TEMPLATE = `Given the following AI assistant response, suggest 2-3 short follow-up replies a user might send. Each reply should be under 100 characters. Return ONLY a JSON array of strings, nothing else.
@@ -98,18 +98,32 @@ export async function generateSuggestions(
   const { cmd, args } = buildCommand(agent, prompt);
 
   return new Promise((resolve) => {
-    const child = execFile(cmd, args, {
-      timeout: 10_000,
-      maxBuffer: 1024 * 1024,
+    const child = spawn(cmd, args, {
       cwd: workspaceDir,
-    }, (error, stdout) => {
-      if (error) {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    child.stdout.on("data", (data: Buffer) => { stdout += data.toString(); });
+    child.stderr.on("data", () => {});
+
+    const timer = setTimeout(() => {
+      child.kill();
+      resolve([]);
+    }, 15_000);
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
         resolve([]);
         return;
       }
       resolve(parseSuggestions(stdout, agent.model));
     });
 
-    child.on("error", () => resolve([]));
+    child.on("error", () => {
+      clearTimeout(timer);
+      resolve([]);
+    });
   });
 }
