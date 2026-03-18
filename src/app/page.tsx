@@ -10,7 +10,9 @@ import NewThreadDialog from "@/components/NewThreadDialog";
 import SettingsDialog from "@/components/SettingsDialog";
 import WorkspaceBar from "@/components/WorkspaceBar";
 import AddWorkspaceDialog from "@/components/AddWorkspaceDialog";
+import GitDialog from "@/components/GitDialog";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
+import { PLUGINS } from "@/lib/plugins";
 
 function useFetch<T>(url: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -72,6 +74,10 @@ export default function Home() {
   const [unreadByThread, setUnreadByThread] = useState<Record<string, string[]>>({});
   const [showNewThread, setShowNewThread] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showGitDialog, setShowGitDialog] = useState(false);
+  const [enabledPlugins, setEnabledPlugins] = useState<string[]>([]);
+  const [gitChangeCount, setGitChangeCount] = useState(0);
+  const [gitIsRepo, setGitIsRepo] = useState(true);
   const streamCompleteThreadId = useRef<string | null>(null);
 
   // Resizable sidebar
@@ -151,6 +157,15 @@ export default function Home() {
   const [config, , refetchConfig] = useFetch<{ agents: Agent[]; displayName?: string }>(configUrl);
   const agents = config?.agents ?? [];
   const displayName = config?.displayName ?? "You";
+
+  useEffect(() => {
+    if (!config) return;
+    const plugins = (config as Record<string, unknown>).plugins as Record<string, boolean> | undefined;
+    const enabled = PLUGINS
+      .filter((p) => plugins?.[p.id] ?? p.enabledByDefault)
+      .map((p) => p.id);
+    setEnabledPlugins(enabled);
+  }, [config]);
 
   const threadsUrl = activeWorkspaceId ? wsUrl("/api/threads") : null;
   const [threads, , refetchThreads] = useFetch<ThreadListItem[]>(threadsUrl);
@@ -235,6 +250,30 @@ export default function Home() {
     setActiveWorkspaceId(id);
     setSelectedThreadId(null);
   }, [activeWorkspaceId]);
+
+  const fetchGitBadge = useCallback(async () => {
+    if (!activeWorkspaceId || !enabledPlugins.includes("git")) {
+      setGitChangeCount(0);
+      return;
+    }
+    try {
+      const res = await fetch(wsUrl("/api/git/status"));
+      if (!res.ok) return;
+      const data = await res.json();
+      setGitIsRepo(data.isRepo);
+      setGitChangeCount(data.staged.length + data.unstaged.length);
+    } catch {
+      setGitIsRepo(false);
+    }
+  }, [activeWorkspaceId, enabledPlugins, wsUrl]);
+
+  useEffect(() => {
+    fetchGitBadge();
+  }, [fetchGitBadge]);
+
+  const handlePluginClick = useCallback((pluginId: string) => {
+    if (pluginId === "git") setShowGitDialog(true);
+  }, []);
 
   const handleRemoveWorkspace = useCallback(
     async (id: string) => {
@@ -433,6 +472,10 @@ export default function Home() {
             onEditWorkspace={handleEditWorkspace}
             onReorderWorkspaces={handleReorderWorkspaces}
             onOpenSettings={() => setShowSettings(true)}
+            enabledPlugins={enabledPlugins}
+            onPluginClick={handlePluginClick}
+            gitChangeCount={gitChangeCount}
+            gitIsRepo={gitIsRepo}
           />
           <div className="relative flex-shrink-0" style={{ width: sidebarWidth }}>
             {threadListEl}
@@ -462,6 +505,14 @@ export default function Home() {
         open={showAddWorkspace}
         onClose={() => setShowAddWorkspace(false)}
         onAdded={handleWorkspaceAdded}
+      />
+      <GitDialog
+        open={showGitDialog}
+        onClose={() => {
+          setShowGitDialog(false);
+          fetchGitBadge();
+        }}
+        workspaceId={activeWorkspaceId}
       />
     </div>
     </WorkspaceProvider>
