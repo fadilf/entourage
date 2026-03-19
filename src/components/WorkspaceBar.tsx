@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Pencil, Trash2, FolderOpen, Settings, Palette, GitBranch } from "lucide-react";
+import { Plus, Pencil, Trash2, FolderOpen, Settings, Palette, GitBranch, HelpCircle } from "lucide-react";
+import AboutDialog from "./AboutDialog";
 import { Workspace, Icon } from "@/lib/types";
 import IconPicker, { renderIcon } from "./IconPicker";
 import Logo from "@/components/Logo";
@@ -43,6 +44,7 @@ export default function WorkspaceBar({
   const [iconPickerTop, setIconPickerTop] = useState(100);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const iconPickerRef = useRef<HTMLDivElement>(null);
@@ -236,6 +238,15 @@ export default function WorkspaceBar({
       {/* Spacer to push settings to bottom */}
       <div className="flex-1" />
 
+      {/* Help / About */}
+      <button
+        onClick={() => setShowAbout(true)}
+        className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+        title="About Entourage"
+      >
+        <HelpCircle size={20} />
+      </button>
+
       {/* Settings gear */}
       <button
         onClick={onOpenSettings}
@@ -244,6 +255,8 @@ export default function WorkspaceBar({
       >
         <Settings size={20} />
       </button>
+
+      <AboutDialog open={showAbout} onClose={() => setShowAbout(false)} />
 
       {/* Context menu via portal to escape overflow-hidden */}
       {contextMenu && createPortal(

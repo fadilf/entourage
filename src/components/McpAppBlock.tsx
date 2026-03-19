@@ -33,9 +33,11 @@ export default function McpAppBlock({
       try {
         const toolsRes = await fetch("/api/mcp-servers/tools");
         const tools = await toolsRes.json();
+        // CLI tools are prefixed as mcp__<server>__<tool> — strip prefix for matching
+        const bareToolName = toolName.replace(/^mcp__[^_]+__/, "");
         const tool = tools.find(
           (t: { toolName: string; serverId: string }) =>
-            t.toolName === toolName && t.serverId === serverId
+            t.toolName === bareToolName && t.serverId === serverId
         );
         if (!tool) {
           setError("Tool not found in MCP server");

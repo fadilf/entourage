@@ -212,34 +212,20 @@ export async function POST(
                     toolName: event.toolName,
                     serverId: mcpAppTool.serverId,
                     toolInput: parsedInput,
+                    html: mcpAppTool.cachedHtml,
                   };
                   accumulatedBlocks.push(appBlock);
 
-                  // Fetch HTML async and send as separate event
-                  const capturedToolName = event.toolName;
-                  const capturedServerId = mcpAppTool.serverId;
-                  mcpManager.readResource(mcpAppTool.serverId, mcpAppTool.resourceUri).then((appHtml) => {
-                    appBlock.html = appHtml;
-                    try {
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                        type: "mcp_app",
-                        toolName: capturedToolName,
-                        serverId: capturedServerId,
-                        toolInput: parsedInput,
-                        html: appHtml,
-                      })}\n\n`));
-                    } catch { /* Client disconnected */ }
-                  }).catch(() => {
-                    // Emit without HTML — client will fetch it
-                    try {
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                        type: "mcp_app",
-                        toolName: capturedToolName,
-                        serverId: capturedServerId,
-                        toolInput: parsedInput,
-                      })}\n\n`));
-                    } catch { /* Client disconnected */ }
-                  });
+                  // Emit mcp_app event with cached HTML so client doesn't need to fetch
+                  try {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                      type: "mcp_app",
+                      toolName: event.toolName,
+                      serverId: mcpAppTool.serverId,
+                      toolInput: parsedInput,
+                      html: mcpAppTool.cachedHtml,
+                    })}\n\n`));
+                  } catch { /* Client disconnected */ }
                 }
               } else if (event.type === "tool_result") {
                 const tc = accumulatedToolCalls.find((t) => t.id === event.toolId);

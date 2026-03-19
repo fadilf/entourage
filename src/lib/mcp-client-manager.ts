@@ -10,6 +10,7 @@ type McpAppTool = {
   serverId: string;
   toolName: string;
   resourceUri: string;
+  cachedHtml?: string;
 };
 
 type ManagedConnection = {
@@ -71,7 +72,7 @@ class McpClientManager {
 
     await client.connect(transport);
 
-    // Discover tools with UI resources
+    // Discover tools with UI resources and pre-fetch their HTML
     const toolsResult = await client.listTools();
     const appTools: McpAppTool[] = [];
     for (const tool of toolsResult.tools) {
@@ -82,6 +83,19 @@ class McpClientManager {
           toolName: tool.name,
           resourceUri: uri,
         };
+        // Pre-fetch and cache the HTML resource to avoid timeout issues later
+        try {
+          const result = await client.readResource({ uri }, { timeout: 120000 });
+          const content = result.contents[0];
+          if ("text" in content && typeof content.text === "string") {
+            appTool.cachedHtml = content.text;
+          } else if ("blob" in content && typeof content.blob === "string") {
+            appTool.cachedHtml = Buffer.from(content.blob, "base64").toString("utf-8");
+          }
+          console.log(`[MCP] Cached HTML for ${tool.name} (${(appTool.cachedHtml?.length ?? 0)} chars)`);
+        } catch (err) {
+          console.warn(`[MCP] Failed to cache HTML for ${tool.name}:`, (err as Error).message);
+        }
         appTools.push(appTool);
         this.appToolIndex.set(tool.name, appTool);
       }
@@ -116,17 +130,28 @@ class McpClientManager {
   }
 
   getAppTool(toolName: string): McpAppTool | undefined {
-    return this.appToolIndex.get(toolName);
+    // Direct match first
+    const direct = this.appToolIndex.get(toolName);
+    if (direct) return direct;
+    // CLI tools are prefixed as mcp__<server>__<tool> — try stripping the prefix
+    const mcpMatch = toolName.match(/^mcp__[^_]+__(.+)$/);
+    if (mcpMatch) return this.appToolIndex.get(mcpMatch[1]);
+    return undefined;
   }
 
   getAllAppTools(): McpAppTool[] {
     return Array.from(this.appToolIndex.values());
   }
 
-  async readResource(serverId: string, uri: string): Promise<string> {
+  getCachedHtml(toolName: string): string | undefined {
+    const tool = this.getAppTool(toolName);
+    return tool?.cachedHtml;
+  }
+
+  private async fetchResource(serverId: string, uri: string): Promise<string> {
     const conn = this.connections.get(serverId);
     if (!conn) throw new Error(`MCP server ${serverId} not connected`);
-    const result = await conn.client.readResource({ uri });
+    const result = await conn.client.readResource({ uri }, { timeout: 60000 });
     const content = result.contents[0];
     if ("text" in content && typeof content.text === "string")
       return content.text;
@@ -134,6 +159,21 @@ class McpClientManager {
       return Buffer.from(content.blob, "base64").toString("utf-8");
     }
     throw new Error("No HTML content in resource");
+  }
+
+  async readResource(serverId: string, uri: string): Promise<string> {
+    try {
+      return await this.fetchResource(serverId, uri);
+    } catch (err) {
+      // Reconnect and retry once on failure
+      console.error(`[MCP] readResource failed, reconnecting:`, (err as Error).message);
+      const servers = await loadMcpServers();
+      const server = servers.find((s) => s.id === serverId);
+      if (!server) throw err;
+      await this.disconnect(serverId);
+      await this.connect(server);
+      return await this.fetchResource(serverId, uri);
+    }
   }
 
   async callTool(
