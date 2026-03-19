@@ -56,6 +56,7 @@ export type Message = {
   contentBlocks?: ContentBlock[];
   suggestions?: string[];
   isReattach?: boolean;
+  snapshotTreeHash?: string;
 };
 
 export type ThreadWithMessages = Thread & { messages: Message[] };

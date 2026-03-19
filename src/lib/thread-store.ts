@@ -183,7 +183,7 @@ export async function updateMessage(
   workspaceDir: string,
   threadId: string,
   messageId: string,
-  updates: Partial<Pick<Message, "content" | "status" | "toolCalls" | "contentBlocks" | "suggestions">>
+  updates: Partial<Pick<Message, "content" | "status" | "toolCalls" | "contentBlocks" | "suggestions" | "snapshotTreeHash">>
 ): Promise<void> {
   return withLock(threadId, async () => {
     const raw = await readFile(getThreadPath(workspaceDir, threadId), "utf-8");
@@ -195,6 +195,7 @@ export async function updateMessage(
     if (updates.toolCalls !== undefined) msg.toolCalls = updates.toolCalls;
     if (updates.contentBlocks !== undefined) msg.contentBlocks = updates.contentBlocks;
     if (updates.suggestions !== undefined) msg.suggestions = updates.suggestions;
+    if (updates.snapshotTreeHash !== undefined) msg.snapshotTreeHash = updates.snapshotTreeHash;
     thread.updatedAt = new Date().toISOString();
     await writeFile(getThreadPath(workspaceDir, threadId), JSON.stringify(thread, null, 2));
   });
