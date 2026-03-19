@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Pencil, Trash2, FolderOpen, Settings, Palette, GitBranch, HelpCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, FolderOpen, Settings, Palette, GitBranch, HelpCircle, Terminal } from "lucide-react";
 import AboutDialog from "./AboutDialog";
 import { Workspace, Icon } from "@/lib/types";
 import IconPicker, { renderIcon } from "./IconPicker";
@@ -49,7 +49,7 @@ export default function WorkspaceBar({
   const inputRef = useRef<HTMLInputElement>(null);
   const iconPickerRef = useRef<HTMLDivElement>(null);
   const wsButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  const hasVisiblePlugins = enabledPlugins.includes("git") || enabledPlugins.includes("files");
+  const hasVisiblePlugins = enabledPlugins.includes("git") || enabledPlugins.includes("files") || enabledPlugins.includes("terminal");
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -143,6 +143,16 @@ export default function WorkspaceBar({
           title="File Browser"
         >
           <FolderOpen size={20} />
+        </button>
+      )}
+
+      {enabledPlugins.includes("terminal") && (
+        <button
+          onClick={() => onPluginClick?.("terminal")}
+          className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors text-zinc-400 hover:text-white hover:bg-zinc-700"
+          title="Terminal"
+        >
+          <Terminal size={20} />
         </button>
       )}
 

@@ -13,6 +13,12 @@ export const PLUGINS: Plugin[] = [
     icon: "FolderOpen",
     enabledByDefault: false,
   },
+  {
+    id: "terminal",
+    name: "Terminal",
+    icon: "Terminal",
+    enabledByDefault: false,
+  },
 ];
 
 export function mapGitStatus(code: string): GitFileEntry["status"] {
