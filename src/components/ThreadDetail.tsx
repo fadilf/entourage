@@ -93,11 +93,13 @@ export default function ThreadDetail({
       threadId: thread.id,
       role: "assistant" as const,
       agentId,
-      content: data.content,
+      content: data.content.replace(/<QuickReply>[\s\S]*$/,  "").trimEnd(),
       timestamp: new Date().toISOString(),
       status: "streaming" as const,
       ...(data.toolCalls?.length ? { toolCalls: data.toolCalls } : {}),
-      ...(data.contentBlocks?.length ? { contentBlocks: data.contentBlocks } : {}),
+      ...(data.contentBlocks?.length ? { contentBlocks: data.contentBlocks.map(b =>
+        b.type === "text" ? { ...b, text: b.text.replace(/<QuickReply>[\s\S]*$/, "").trimEnd() } : b
+      ) } : {}),
       ...(data.isReattach ? { isReattach: true } : {}),
     })
   );
