@@ -242,7 +242,7 @@ export default function ThreadList({
           />
         ))}
         {archivedThreads.length > 0 && (
-          <div className="mt-1 border-t border-zinc-100 dark:border-zinc-700 pt-1">
+          <div className="mt-1">
             <button
               onClick={() => setShowArchived(!showArchived)}
               className="flex w-full items-center gap-2 px-3.5 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl"
