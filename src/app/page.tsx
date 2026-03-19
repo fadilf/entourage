@@ -251,6 +251,12 @@ export default function Home() {
     }
   }, [selectedThread]);
 
+  // Update document title with workspace name
+  const activeWorkspaceName = workspaces.find(w => w.id === activeWorkspaceId)?.name;
+  useEffect(() => {
+    document.title = activeWorkspaceName ? `${activeWorkspaceName} | Entourage` : "Entourage";
+  }, [activeWorkspaceName]);
+
   const handleDraftChange = useCallback((hasText: boolean) => {
     if (hasText) {
       setSuggestions([]);
@@ -495,7 +501,7 @@ export default function Home() {
       statuses={statuses}
       unreadByThread={unreadByThread}
       isMobile={isMobile}
-      workspaceName={workspaces.find(w => w.id === activeWorkspaceId)?.name}
+      workspaceName={activeWorkspaceName}
     />
   );
 
