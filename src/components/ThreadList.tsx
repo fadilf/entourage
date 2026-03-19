@@ -52,8 +52,8 @@ function ThreadItem({
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
       onContextMenu={onContextMenu}
-      className={`flex w-full gap-3 px-5 py-3.5 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-        isSelected ? "bg-zinc-100 dark:bg-zinc-800" : "cursor-pointer"
+      className={`flex w-full gap-3 px-3.5 py-3 text-left transition-colors rounded-xl ${
+        isSelected ? "bg-zinc-100 dark:bg-zinc-800" : "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
       }`}
     >
       {agents.length <= 1 ? (
@@ -200,7 +200,7 @@ export default function ThreadList({
 
   return (
     <div className="flex h-full w-full flex-col border-r border-zinc-200 dark:border-zinc-700">
-      <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700 px-5 py-4">
+      <div className="flex items-center justify-between px-5 py-4">
         <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
           {workspaceName || "Entourage"}
         </h1>
@@ -222,9 +222,9 @@ export default function ThreadList({
           )}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
         {activeThreads.length === 0 && archivedThreads.length === 0 && (
-          <div className="px-5 py-8 text-center text-sm text-zinc-400 dark:text-zinc-500">
+          <div className="px-3 py-8 text-center text-sm text-zinc-400 dark:text-zinc-500">
             No threads yet. Create one to get started.
           </div>
         )}
@@ -242,10 +242,10 @@ export default function ThreadList({
           />
         ))}
         {archivedThreads.length > 0 && (
-          <div className="border-t border-zinc-100 dark:border-zinc-700">
+          <div className="mt-1 border-t border-zinc-100 dark:border-zinc-700 pt-1">
             <button
               onClick={() => setShowArchived(!showArchived)}
-              className="flex w-full items-center gap-2 px-5 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              className="flex w-full items-center gap-2 px-3.5 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl"
             >
               <ChevronRight
                 className={`h-3.5 w-3.5 transition-transform ${showArchived ? "rotate-90" : ""}`}
