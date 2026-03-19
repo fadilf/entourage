@@ -104,30 +104,21 @@ export default function WorkspaceBar({
   };
 
   return (
-    <div className="flex flex-col items-center w-16 bg-zinc-900 py-3 gap-2 flex-shrink-0">
+    <div className="flex flex-col items-center w-16 bg-zinc-900 py-3 px-2 gap-2 flex-shrink-0 border-r border-zinc-700">
       {/* Logo */}
-      <div className="w-10 h-10 flex items-center justify-center ml-3">
+      <div className="w-10 h-10 flex items-center justify-center">
         <Logo className="h-7 w-7" />
       </div>
 
-      {/* Settings gear */}
-      <button
-        onClick={onOpenSettings}
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors ml-3"
-        title="Settings"
-      >
-        <Settings size={20} />
-      </button>
-
-      {/* Separator */}
-      {hasVisiblePlugins && <div className="w-8 h-px bg-zinc-700 my-1" />}
+      {/* Separator — extends past padding to connect with ThreadList header border */}
+      <div className="-mx-2 self-stretch h-px bg-zinc-700 mb-1" />
 
       {/* Plugin icons */}
       {enabledPlugins.includes("git") && (
         <button
           onClick={() => onPluginClick?.("git")}
           disabled={!gitIsRepo}
-          className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors ml-3 ${
+          className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
             gitIsRepo
               ? "text-zinc-400 hover:text-white hover:bg-zinc-700"
               : "text-zinc-600 cursor-not-allowed"
@@ -146,7 +137,7 @@ export default function WorkspaceBar({
       {enabledPlugins.includes("files") && (
         <button
           onClick={() => onPluginClick?.("files")}
-          className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors ml-3 text-zinc-400 hover:text-white hover:bg-zinc-700"
+          className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors text-zinc-400 hover:text-white hover:bg-zinc-700"
           title="File Browser"
         >
           <FolderOpen size={20} />
@@ -185,7 +176,7 @@ export default function WorkspaceBar({
             )}
             {/* Active indicator pill */}
             <div
-              className={`absolute -left-0.5 w-1 rounded-r-full transition-all duration-200 ${
+              className={`absolute -left-2.5 w-1 rounded-r-full transition-all duration-200 ${
                 isActive ? "h-8 bg-white" : "h-0 group-hover:h-4 bg-white/60"
               }`}
             />
@@ -200,7 +191,7 @@ export default function WorkspaceBar({
                   if (e.key === "Enter") handleRenameSubmit(ws.id);
                   if (e.key === "Escape") setEditing(null);
                 }}
-                className="w-10 h-10 rounded-xl text-xs text-center bg-zinc-700 text-white border border-zinc-500 outline-none ml-3"
+                className="w-10 h-10 rounded-xl text-xs text-center bg-zinc-700 text-white border border-zinc-500 outline-none"
               />
             ) : (
               <>
@@ -208,7 +199,7 @@ export default function WorkspaceBar({
                   ref={(el) => { if (el) wsButtonRefs.current.set(ws.id, el); }}
                   onClick={() => onSelectWorkspace(ws.id)}
                   onContextMenu={(e) => handleContextMenu(e, ws.id)}
-                  className={`peer w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold text-white ml-3 transition-all duration-200 ${
+                  className={`peer w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold text-white transition-all duration-200 ${
                     isActive
                       ? "rounded-2xl shadow-lg shadow-black/30 scale-105"
                       : "hover:rounded-2xl hover:brightness-110"
@@ -236,10 +227,22 @@ export default function WorkspaceBar({
       {/* Add workspace */}
       <button
         onClick={onAddWorkspace}
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors ml-3"
+        className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
         title="Add workspace"
       >
         <Plus size={20} />
+      </button>
+
+      {/* Spacer to push settings to bottom */}
+      <div className="flex-1" />
+
+      {/* Settings gear */}
+      <button
+        onClick={onOpenSettings}
+        className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+        title="Settings"
+      >
+        <Settings size={20} />
       </button>
 
       {/* Context menu via portal to escape overflow-hidden */}

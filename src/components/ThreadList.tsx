@@ -200,7 +200,7 @@ export default function ThreadList({
 
   return (
     <div className="flex h-full w-full flex-col border-r border-zinc-200 dark:border-zinc-700">
-      <div className="flex items-center justify-between px-5 py-4">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-700">
         <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
           {workspaceName || "Entourage"}
         </h1>
@@ -222,7 +222,7 @@ export default function ThreadList({
           )}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
+      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-2 flex flex-col gap-1">
         {activeThreads.length === 0 && archivedThreads.length === 0 && (
           <div className="px-3 py-8 text-center text-sm text-zinc-400 dark:text-zinc-500">
             No threads yet. Create one to get started.

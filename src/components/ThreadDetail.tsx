@@ -5,7 +5,6 @@ import { ThreadWithMessages, Agent, Message, MessageImage } from "@/lib/types";
 import { ChevronLeft, Copy, Pencil, RotateCcw, Send } from "lucide-react";
 import Dialog from "./Dialog";
 import MessageList from "./MessageList";
-import ModelIcon from "./ModelIcon";
 import MessageInput from "./MessageInput";
 import QuickReplies from "./QuickReplies";
 import ContextMenu from "./ContextMenu";
@@ -148,7 +147,7 @@ export default function ThreadDetail({
           ) : (
             <>
               <h2
-                className={`text-sm font-medium text-zinc-900 dark:text-zinc-100 ${isMobile ? "truncate" : "cursor-pointer hover:text-zinc-600 dark:hover:text-zinc-300"}`}
+                className={`text-lg font-semibold text-zinc-900 dark:text-zinc-100 ${isMobile ? "truncate" : "cursor-pointer hover:text-zinc-600 dark:hover:text-zinc-300"}`}
                 onDoubleClick={isMobile ? undefined : () => {
                   setEditTitle(thread.title);
                   setIsEditingTitle(true);
@@ -173,25 +172,8 @@ export default function ThreadDetail({
             </>
           )}
         </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {thread.agents.map((agent) => (
-            <span
-              key={agent.id}
-              className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 text-xs dark:bg-zinc-800"
-            >
-              <span
-                className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800"
-                style={{ border: `1.5px solid ${agent.avatarColor}`, boxShadow: `inset 0 1px 4px ${agent.avatarColor}80` }}
-              >
-                <ModelIcon model={agent.model} icon={agent.icon} className="h-2.5 w-2.5" />
-              </span>
-              <span className="text-zinc-700 dark:text-zinc-300">{agent.name}</span>
-              <span className="text-zinc-500 dark:text-zinc-400">· {agent.model}</span>
-            </span>
-          ))}
-        </div>
       </div>
-      <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto py-2">
+      <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto pt-3 pb-2">
         <MessageList
           messages={allMessages}
           agents={thread.agents}
