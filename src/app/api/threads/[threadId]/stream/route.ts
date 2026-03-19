@@ -10,6 +10,7 @@ import { stripMentions } from "@/lib/mentions";
 import path from "path";
 import { getUploadsDir } from "@/lib/config";
 import { resolveWorkspaceDir } from "@/lib/workspace-context";
+import { captureSnapshot } from "@/lib/snapshots";
 
 export async function POST(
   request: Request,
@@ -112,6 +113,14 @@ export async function POST(
     timestamp: new Date().toISOString(),
     status: "streaming",
   });
+
+  // Capture workspace snapshot before agent makes changes (best-effort)
+  const snapshotHash = await captureSnapshot(workspaceDir);
+  if (snapshotHash) {
+    await updateMessage(workspaceDir, threadId, assistantMsg.id, {
+      snapshotTreeHash: snapshotHash,
+    });
+  }
 
   // Check if this agent already has completed assistant messages (for --resume)
   const hasHistory = thread.messages.some(
