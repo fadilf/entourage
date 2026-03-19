@@ -11,6 +11,7 @@ import path from "path";
 import { getUploadsDir } from "@/lib/config";
 import { resolveWorkspaceDir } from "@/lib/workspace-context";
 import { captureSnapshot } from "@/lib/snapshots";
+import { getMcpClientManager } from "@/lib/mcp-client-manager";
 
 export async function POST(
   request: Request,
@@ -138,6 +139,10 @@ export async function POST(
     ? buildFullHistoryPrompt(thread.messages, agent.id, thread.agents, cleanPrompt)
     : undefined;
 
+  // Ensure MCP servers are connected (lazy init, idempotent)
+  const mcpManager = getMcpClientManager();
+  await mcpManager.connectAll().catch(() => {});
+
   let accumulatedContent = "";
   const accumulatedToolCalls: ToolCall[] = [];
   const accumulatedBlocks: ContentBlock[] = [];
@@ -193,6 +198,49 @@ export async function POST(
                 try {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
                 } catch { /* Client disconnected */ }
+
+                // Check if this tool has an MCP App UI
+                const mcpAppTool = mcpManager.getAppTool(event.toolName);
+                if (mcpAppTool) {
+                  let parsedInput: Record<string, unknown> | undefined;
+                  if (event.input) {
+                    try { parsedInput = JSON.parse(event.input); } catch { /* skip */ }
+                  }
+
+                  const appBlock: ContentBlock = {
+                    type: "mcp_app",
+                    toolName: event.toolName,
+                    serverId: mcpAppTool.serverId,
+                    toolInput: parsedInput,
+                  };
+                  accumulatedBlocks.push(appBlock);
+
+                  // Fetch HTML async and send as separate event
+                  const capturedToolName = event.toolName;
+                  const capturedServerId = mcpAppTool.serverId;
+                  mcpManager.readResource(mcpAppTool.serverId, mcpAppTool.resourceUri).then((appHtml) => {
+                    appBlock.html = appHtml;
+                    try {
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                        type: "mcp_app",
+                        toolName: capturedToolName,
+                        serverId: capturedServerId,
+                        toolInput: parsedInput,
+                        html: appHtml,
+                      })}\n\n`));
+                    } catch { /* Client disconnected */ }
+                  }).catch(() => {
+                    // Emit without HTML — client will fetch it
+                    try {
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                        type: "mcp_app",
+                        toolName: capturedToolName,
+                        serverId: capturedServerId,
+                        toolInput: parsedInput,
+                      })}\n\n`));
+                    } catch { /* Client disconnected */ }
+                  });
+                }
               } else if (event.type === "tool_result") {
                 const tc = accumulatedToolCalls.find((t) => t.id === event.toolId);
                 if (tc) {
@@ -202,6 +250,25 @@ export async function POST(
                 try {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
                 } catch { /* Client disconnected */ }
+
+                // Forward result to MCP App block if present
+                const matchingTc = accumulatedToolCalls.find((t) => t.id === event.toolId);
+                if (matchingTc) {
+                  const appBlock = accumulatedBlocks.find(
+                    (b) => b.type === "mcp_app" && b.toolName === matchingTc.name
+                  );
+                  if (appBlock && appBlock.type === "mcp_app") {
+                    try {
+                      const resultData = JSON.parse(event.output);
+                      appBlock.toolResult = resultData;
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                        type: "mcp_app_result",
+                        toolName: appBlock.toolName,
+                        toolResult: resultData,
+                      })}\n\n`));
+                    } catch { /* non-JSON output, skip */ }
+                  }
+                }
               } else if (event.type === "error") {
                 // API-level error from the CLI (e.g. rate limit, auth failure)
                 const errorText = `[Error: ${event.message}]`;

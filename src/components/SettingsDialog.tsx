@@ -6,7 +6,7 @@ import { PLUGINS } from "@/lib/plugins";
 import Dialog from "./Dialog";
 import ModelIcon from "./ModelIcon";
 import IconPicker from "./IconPicker";
-import { ArrowLeft, GripVertical, Pencil, Trash2, Sun, Moon } from "lucide-react";
+import { ArrowLeft, ChevronRight, GripVertical, Pencil, Trash2, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 type AgentFormData = {
@@ -29,7 +29,9 @@ const emptyForm: AgentFormData = {
   avatarColor: "#8b5cf6",
 };
 
-type Tab = "general" | "agents" | "plugins";
+type McpServer = { id: string; name: string; command?: string; args?: string[]; url?: string; transport: string; connected: boolean; appToolCount: number };
+
+type Tab = "general" | "agents" | "plugins" | "mcp";
 
 export default function SettingsDialog({
   open,
@@ -54,10 +56,19 @@ export default function SettingsDialog({
   const [quickRepliesEnabled, setQuickRepliesEnabled] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
+  const [mcpForm, setMcpForm] = useState({ name: "", url: "", command: "", args: "" });
+  const [mcpAdding, setMcpAdding] = useState(false);
+  const [mcpAdvanced, setMcpAdvanced] = useState(false);
 
   const fetchAgents = useCallback(async () => {
     const res = await fetch(`/api/agents`);
     if (res.ok) setAgents(await res.json());
+  }, []);
+
+  const fetchMcpServers = useCallback(async () => {
+    const res = await fetch("/api/mcp-servers");
+    if (res.ok) setMcpServers(await res.json());
   }, []);
 
   const fetchConfig = useCallback(async () => {
@@ -77,8 +88,9 @@ export default function SettingsDialog({
     if (open) {
       fetchAgents();
       fetchConfig();
+      fetchMcpServers();
     }
-  }, [open, fetchAgents, fetchConfig]);
+  }, [open, fetchAgents, fetchConfig, fetchMcpServers]);
 
   const handleSaveDisplayName = async () => {
     const res = await fetch(`/api/config`, {
@@ -209,7 +221,7 @@ export default function SettingsDialog({
           </div>
           {!showForm && (
             <div className="flex gap-1 -mb-px">
-              {([["general", "General"], ["agents", "Agent Profiles"], ["plugins", "Plugins"]] as const).map(([key, label]) => (
+              {([["general", "General"], ["agents", "Agent Profiles"], ["plugins", "Plugins"], ["mcp", "MCP Servers"]] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => { setTab(key); setError(""); }}
@@ -524,6 +536,122 @@ export default function SettingsDialog({
                   </div>
                 );
               })}
+            </div>
+          ) : tab === "mcp" ? (
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">MCP Servers</h4>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                Connect to MCP servers that provide interactive app UIs for their tools.
+              </p>
+
+              {/* Add form */}
+              <div className="space-y-2 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
+                <input
+                  type="text"
+                  value={mcpForm.name}
+                  onChange={(e) => setMcpForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Name"
+                  className="w-full rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+                <input
+                  type="text"
+                  value={mcpForm.url}
+                  onChange={(e) => setMcpForm((f) => ({ ...f, url: e.target.value }))}
+                  placeholder="Remote MCP server URL"
+                  className="w-full rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+
+                {/* Advanced settings toggle */}
+                <button
+                  type="button"
+                  onClick={() => setMcpAdvanced(!mcpAdvanced)}
+                  className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                >
+                  <ChevronRight className={`h-3 w-3 transition-transform ${mcpAdvanced ? "rotate-90" : ""}`} />
+                  Advanced settings
+                </button>
+
+                {mcpAdvanced && (
+                  <div className="space-y-2 pl-4 border-l-2 border-zinc-200 dark:border-zinc-700">
+                    <p className="text-[10px] text-zinc-400">For local stdio servers (instead of remote URL)</p>
+                    <input
+                      type="text"
+                      value={mcpForm.command}
+                      onChange={(e) => setMcpForm((f) => ({ ...f, command: e.target.value }))}
+                      placeholder="Command (e.g. npx)"
+                      className="w-full rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                    <input
+                      type="text"
+                      value={mcpForm.args}
+                      onChange={(e) => setMcpForm((f) => ({ ...f, args: e.target.value }))}
+                      placeholder="Arguments (e.g. -y @modelcontextprotocol/server-map --stdio)"
+                      className="w-full rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                  </div>
+                )}
+
+                <button
+                  onClick={async () => {
+                    const hasUrl = mcpForm.url.trim();
+                    const hasCommand = mcpForm.command.trim();
+                    if (!mcpForm.name.trim() || (!hasUrl && !hasCommand)) return;
+                    setMcpAdding(true);
+                    await fetch("/api/mcp-servers", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        name: mcpForm.name.trim(),
+                        transport: hasUrl ? "sse" : "stdio",
+                        ...(hasUrl
+                          ? { url: mcpForm.url.trim() }
+                          : {
+                              command: mcpForm.command.trim(),
+                              args: mcpForm.args.trim().split(/\s+/).filter(Boolean),
+                            }),
+                      }),
+                    });
+                    setMcpForm({ name: "", url: "", command: "", args: "" });
+                    setMcpAdding(false);
+                    setMcpAdvanced(false);
+                    fetchMcpServers();
+                  }}
+                  disabled={mcpAdding || !mcpForm.name.trim() || (!mcpForm.url.trim() && !mcpForm.command.trim())}
+                  className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50"
+                >
+                  {mcpAdding ? "Connecting..." : "Add"}
+                </button>
+              </div>
+
+              {/* Server list */}
+              {mcpServers.map((server) => (
+                <div key={server.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700">
+                  <div className="flex items-center gap-2">
+                    <div className={`h-2 w-2 rounded-full ${server.connected ? "bg-emerald-500" : "bg-red-400"}`} />
+                    <div>
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{server.name}</span>
+                      <p className="text-xs text-zinc-400">
+                        {(server as McpServer & { url?: string }).url || `${server.command} ${server.args?.join(" ")}`}
+                        {server.connected && ` · ${server.appToolCount} app tool${server.appToolCount !== 1 ? "s" : ""}`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      await fetch(`/api/mcp-servers/${server.id}`, { method: "DELETE" });
+                      fetchMcpServers();
+                    }}
+                    className="rounded p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30"
+                    title="Remove"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+
+              {mcpServers.length === 0 && (
+                <p className="text-center text-xs text-zinc-400 py-4">No MCP servers configured</p>
+              )}
             </div>
           ) : null}
         </div>

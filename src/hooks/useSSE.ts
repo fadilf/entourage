@@ -152,6 +152,34 @@ export function useAgentStream(
                   threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", toolCalls, contentBlocks: blocks });
                   triggerRender();
                 }
+              } else if (event.type === "mcp_app") {
+                const threadStreams = allStreams.current.get(targetThreadId);
+                if (threadStreams) {
+                  const existing = threadStreams.get(agentId);
+                  const blocks = [...(existing?.contentBlocks ?? [])];
+                  blocks.push({
+                    type: "mcp_app",
+                    toolName: event.toolName,
+                    serverId: event.serverId,
+                    toolInput: event.toolInput,
+                    html: event.html,
+                  });
+                  threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", contentBlocks: blocks });
+                  triggerRender();
+                }
+              } else if (event.type === "mcp_app_result") {
+                const threadStreams = allStreams.current.get(targetThreadId);
+                if (threadStreams) {
+                  const existing = threadStreams.get(agentId);
+                  const blocks = [...(existing?.contentBlocks ?? [])];
+                  const appIdx = blocks.findLastIndex((b) => b.type === "mcp_app" && (b as { toolName: string }).toolName === event.toolName);
+                  if (appIdx >= 0) {
+                    const block = blocks[appIdx] as { type: "mcp_app"; toolName: string; serverId: string; toolInput?: Record<string, unknown>; toolResult?: Record<string, unknown>; html?: string };
+                    blocks[appIdx] = { ...block, toolResult: event.toolResult };
+                  }
+                  threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", contentBlocks: blocks });
+                  triggerRender();
+                }
               } else if (event.type === "suggestions") {
                 if (targetThreadId === threadIdRef.current) {
                   onSuggestionsRef.current?.(event.suggestions);
@@ -321,6 +349,34 @@ export function useAgentStream(
                     blocks[blockIdx] = { type: "tool_call", toolCall: { ...block.toolCall, status: "complete", output: event.output } };
                   }
                   threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", toolCalls, contentBlocks: blocks });
+                  triggerRender();
+                }
+              } else if (event.type === "mcp_app") {
+                const threadStreams = allStreams.current.get(reattachThreadId);
+                if (threadStreams) {
+                  const existing = threadStreams.get(agentId);
+                  const blocks = [...(existing?.contentBlocks ?? [])];
+                  blocks.push({
+                    type: "mcp_app",
+                    toolName: event.toolName,
+                    serverId: event.serverId,
+                    toolInput: event.toolInput,
+                    html: event.html,
+                  });
+                  threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", contentBlocks: blocks });
+                  triggerRender();
+                }
+              } else if (event.type === "mcp_app_result") {
+                const threadStreams = allStreams.current.get(reattachThreadId);
+                if (threadStreams) {
+                  const existing = threadStreams.get(agentId);
+                  const blocks = [...(existing?.contentBlocks ?? [])];
+                  const appIdx = blocks.findLastIndex((b) => b.type === "mcp_app" && (b as { toolName: string }).toolName === event.toolName);
+                  if (appIdx >= 0) {
+                    const block = blocks[appIdx] as { type: "mcp_app"; toolName: string; serverId: string; toolInput?: Record<string, unknown>; toolResult?: Record<string, unknown>; html?: string };
+                    blocks[appIdx] = { ...block, toolResult: event.toolResult };
+                  }
+                  threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", contentBlocks: blocks });
                   triggerRender();
                 }
               } else if (event.type === "suggestions") {

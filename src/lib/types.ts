@@ -41,7 +41,20 @@ export type ToolCall = {
 
 export type ContentBlock =
   | { type: "text"; text: string }
-  | { type: "tool_call"; toolCall: ToolCall };
+  | { type: "tool_call"; toolCall: ToolCall }
+  | { type: "mcp_app"; toolName: string; serverId: string; toolInput?: Record<string, unknown>; toolResult?: Record<string, unknown>; html?: string };
+
+export type McpServerConfig = {
+  id: string;
+  name: string;
+  transport: "stdio" | "sse";
+  // stdio transport
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  // sse transport
+  url?: string;
+};
 
 export type Message = {
   id: string;
