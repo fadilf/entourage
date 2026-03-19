@@ -414,23 +414,29 @@ export default function Home() {
 
       if (!res.ok) return false;
 
-      const { message, targetAgents, threadUpdated } = await res.json();
+      const { message, targetAgents, threadUpdated, thread } = await res.json();
 
       // Update local state immediately
       setSelectedThread((prev) =>
-        prev ? { ...prev, messages: [...prev.messages, message] } : prev
+        prev
+          ? {
+              ...prev,
+              messages: [...prev.messages, message],
+              agents: thread?.agents ?? prev.agents,
+              updatedAt: thread?.updatedAt ?? prev.updatedAt,
+            }
+          : prev
       );
 
-      // Refetch thread to pick up newly added agents
       if (threadUpdated) {
-        refetchThread();
+        refetchThreads();
       }
 
       // Start streaming for target agents
       sendMessage(content, targetAgents, images);
       return true;
     },
-    [selectedThreadId, sendMessage, setSelectedThread, refetchThread, wsUrl]
+    [selectedThreadId, sendMessage, setSelectedThread, refetchThreads, wsUrl]
   );
 
   const handleSendMessage = useCallback(

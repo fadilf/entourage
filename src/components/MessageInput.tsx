@@ -1,18 +1,47 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Paperclip, X, Mic, Square } from "lucide-react";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { Agent, MessageImage } from "@/lib/types";
 import ModelIcon from "./ModelIcon";
-import { useWsParam } from "@/contexts/WorkspaceContext";
+import { useWorkspaceId, useWsParam } from "@/contexts/WorkspaceContext";
 
 type PendingImage = {
   file: File;
   preview: string;
 };
 
+function getDraftStorageKey(workspaceId: string | null, threadId: string): string {
+  return `entourage-message-draft:${workspaceId ?? "default"}:${threadId}`;
+}
+
+function readDraft(storageKey: string): string {
+  if (typeof window === "undefined") return "";
+
+  try {
+    return localStorage.getItem(storageKey) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeDraft(storageKey: string, value: string): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (value) {
+      localStorage.setItem(storageKey, value);
+    } else {
+      localStorage.removeItem(storageKey);
+    }
+  } catch {
+    // Ignore localStorage errors and keep the in-memory draft working.
+  }
+}
+
 export default function MessageInput({
+  threadId,
   agents,
   allAgents,
   onSendMessage,
@@ -23,6 +52,7 @@ export default function MessageInput({
   showTopBorder = true,
   compactTopPadding = false,
 }: {
+  threadId: string;
   agents: Agent[];
   allAgents?: Agent[];
   onSendMessage: (content: string, images?: MessageImage[]) => void;
@@ -33,8 +63,10 @@ export default function MessageInput({
   showTopBorder?: boolean;
   compactTopPadding?: boolean;
 }) {
+  const workspaceId = useWorkspaceId();
   const wsParam = useWsParam();
-  const [content, setContent] = useState("");
+  const draftStorageKey = getDraftStorageKey(workspaceId, threadId);
+  const [content, setContent] = useState(() => readDraft(draftStorageKey));
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
@@ -43,10 +75,22 @@ export default function MessageInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const updateDraft = useCallback(
+    (value: string) => {
+      setContent(value);
+      writeDraft(draftStorageKey, value);
+    },
+    [draftStorageKey]
+  );
+
   const { isListening, interimText, isSupported, permissionDenied, toggle, stopListening: stopVoice } = useVoiceInput(
     useCallback((text: string) => {
-      setContent((prev) => prev + text);
-    }, [])
+      setContent((prev) => {
+        const next = prev + text;
+        writeDraft(draftStorageKey, next);
+        return next;
+      });
+    }, [draftStorageKey])
   );
 
   const autocompleteAgents = allAgents ?? agents;
@@ -56,6 +100,18 @@ export default function MessageInput({
   );
 
   const canSend = (content.trim() || pendingImages.length > 0) && !disabled && !uploading;
+
+  useEffect(() => {
+    onDraftChange?.(content.trim().length > 0);
+  }, [content, onDraftChange]);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + "px";
+  }, [content]);
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -107,16 +163,14 @@ export default function MessageInput({
     }
 
     onSendMessage(content.trim(), images);
-    setContent("");
-    onDraftChange?.(false);
+    updateDraft("");
     setShowMentions(false);
-  }, [canSend, content, pendingImages, onSendMessage, uploadImages, onDraftChange]);
+  }, [canSend, content, pendingImages, onSendMessage, uploadImages, updateDraft]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const value = e.target.value;
-      setContent(value);
-      onDraftChange?.(value.trim().length > 0);
+      updateDraft(value);
 
       const cursorPos = e.target.selectionStart;
       const textBeforeCursor = value.slice(0, cursorPos);
@@ -128,7 +182,7 @@ export default function MessageInput({
         setShowMentions(false);
       }
     },
-    [onDraftChange]
+    [updateDraft]
   );
 
   const insertMention = useCallback(
@@ -143,12 +197,12 @@ export default function MessageInput({
         const start = cursorPos - mentionMatch[0].length;
         const newContent =
           content.slice(0, start) + `@${agent.name.toLowerCase()} ` + content.slice(cursorPos);
-        setContent(newContent);
+        updateDraft(newContent);
       }
       setShowMentions(false);
       textarea.focus();
     },
-    [content]
+    [content, updateDraft]
   );
 
   const handleKeyDown = useCallback(

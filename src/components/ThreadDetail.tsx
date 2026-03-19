@@ -210,6 +210,7 @@ export default function ThreadDetail({
         />
         <MessageInput
           key={thread.id}
+          threadId={thread.id}
           agents={thread.agents}
           allAgents={allAgents}
           onSendMessage={onSendMessage}

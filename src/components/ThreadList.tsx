@@ -106,7 +106,7 @@ function ThreadItem({
           })}
         </div>
       )}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
             {thread.title}
@@ -126,9 +126,6 @@ function ThreadItem({
             </span>
           </div>
         </div>
-        <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-          {thread.agents.map((a) => a.name).join(", ")}
-        </span>
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">
             {thread.lastMessagePreview}

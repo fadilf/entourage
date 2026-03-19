@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getThread, addMessage, addAgentsToThread } from "@/lib/thread-store";
+import { getThread, addMessage, syncThreadAgents } from "@/lib/thread-store";
 import { loadAgents } from "@/lib/agent-store";
 import { parseMentions } from "@/lib/mentions";
 import { resolveWorkspaceDir } from "@/lib/workspace-context";
@@ -35,14 +35,16 @@ export async function POST(
     ? mentionedAgents
     : [thread.agents[0]]; // Default to first agent
 
-  // Add any mentioned agents not already in the thread
-  const threadAgentIds = new Set(thread.agents.map((a) => a.id));
-  const newAgents = targetAgents.filter((a) => !threadAgentIds.has(a.id));
-  let threadUpdated = false;
-  if (newAgents.length > 0) {
-    await addAgentsToThread(workspaceDir, threadId, newAgents);
-    threadUpdated = true;
-  }
+  const activeAgent = targetAgents[targetAgents.length - 1];
+  const { thread: updatedThread, changed: threadUpdated } =
+    targetAgents.length > 0 && activeAgent
+      ? await syncThreadAgents(workspaceDir, threadId, targetAgents, activeAgent.id)
+      : { thread, changed: false };
 
-  return NextResponse.json({ message, targetAgents, threadUpdated });
+  return NextResponse.json({
+    message,
+    targetAgents,
+    threadUpdated,
+    thread: updatedThread,
+  });
 }
