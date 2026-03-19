@@ -4,15 +4,17 @@ export default function QuickReplies({
   suggestions,
   loading,
   onSelect,
+  className,
 }: {
   suggestions: string[];
   loading: boolean;
   onSelect: (text: string) => void;
+  className?: string;
 }) {
   if (!loading && suggestions.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2 px-4 pb-2">
+    <div className={`flex flex-wrap gap-2 ${className ?? "px-4 pb-2"}`}>
       {loading
         ? Array.from({ length: 3 }).map((_, i) => (
             <div

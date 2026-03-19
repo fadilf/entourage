@@ -2,7 +2,7 @@
 
 import { Message, Agent } from "@/lib/types";
 import ModelIcon from "./ModelIcon";
-import SlackMessage from "./SlackMessage";
+import ChatMessage from "./ChatMessage";
 
 function formatTime(timestamp: string) {
   return new Date(timestamp).toLocaleTimeString([], {
@@ -29,27 +29,17 @@ export default function MessageGroup({
   isUser: boolean;
   isStreaming: boolean;
   displayName?: string;
-  onContextMenu?: (messageId: string, groupText: string, x: number, y: number) => void;
+  onContextMenu?: (message: Message, x: number, y: number) => void;
 }) {
   const firstMessage = group.messages[0];
-  const lastMessage = group.messages[group.messages.length - 1];
 
   return (
-    <div
-      className="border-b border-zinc-100 dark:border-zinc-800 py-2 last:border-b-0"
-      onContextMenu={(e) => {
-        if (onContextMenu) {
-          e.preventDefault();
-          const groupText = group.messages.map((m) => m.content).join("\n\n");
-          onContextMenu(lastMessage.id, groupText, e.clientX, e.clientY);
-        }
-      }}
-    >
+    <div className="border-b border-zinc-100 dark:border-zinc-800 py-1.5 last:border-b-0">
       {/* Group header with avatar */}
-      <div className="flex gap-3 px-5">
+      <div className="flex gap-2.5 px-4">
         {/* Avatar */}
         <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isUser ? "bg-zinc-900 dark:bg-zinc-600" : ""}`}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${isUser ? "bg-zinc-900 dark:bg-zinc-600" : ""}`}
           style={
             isUser
               ? undefined
@@ -75,31 +65,39 @@ export default function MessageGroup({
 
         {/* Name + timestamp + first message */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100">
               {isUser ? displayName : agent?.name || "Unknown"}
             </span>
             {!isUser && agent?.model && (
               <span className="text-[11px] text-zinc-400 dark:text-zinc-500">{agent.model}</span>
             )}
             {isStreaming && !isUser && (
-              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
             )}
             <span className="text-[11px] text-zinc-400">
               {formatTime(firstMessage.timestamp)}
             </span>
           </div>
-          <SlackMessage message={firstMessage} isUser={isUser} />
+          <ChatMessage
+            message={firstMessage}
+            isUser={isUser}
+            onContextMenu={onContextMenu}
+          />
         </div>
       </div>
 
       {/* Subsequent messages in the group — indented past avatar */}
       {group.messages.slice(1).map((message) => (
-        <div key={message.id} className="flex gap-3 px-5">
+        <div key={message.id} className="flex gap-2.5 px-4">
           {/* Spacer matching avatar width */}
-          <div className="w-9 shrink-0" />
+          <div className="w-7 shrink-0" />
           <div className="min-w-0 flex-1">
-            <SlackMessage message={message} isUser={isUser} />
+            <ChatMessage
+              message={message}
+              isUser={isUser}
+              onContextMenu={onContextMenu}
+            />
           </div>
         </div>
       ))}

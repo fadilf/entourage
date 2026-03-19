@@ -79,7 +79,9 @@ export function getCliCommand(model: string, prompt: string, sessionId: string, 
     }
     if (hasImages) {
       for (const p of imagePaths) {
-        args.push("-i", p);
+        // `--image <FILE>...` is variadic; `-i path prompt` causes the prompt to be
+        // consumed as another image arg. Use the `--image=<FILE>` form instead.
+        args.push(`--image=${p}`);
       }
     }
     args.push(effectivePrompt);

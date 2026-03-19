@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Plus, Pencil, Trash2, FolderOpen, Settings, Palette, GitBranch } from "lucide-react";
 import { Workspace, Icon } from "@/lib/types";
 import IconPicker, { renderIcon } from "./IconPicker";
+import Logo from "@/components/Logo";
 
 type Props = {
   workspaces: Workspace[];
@@ -46,6 +47,7 @@ export default function WorkspaceBar({
   const inputRef = useRef<HTMLInputElement>(null);
   const iconPickerRef = useRef<HTMLDivElement>(null);
   const wsButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const hasVisiblePlugins = enabledPlugins.includes("git") || enabledPlugins.includes("files");
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -103,6 +105,11 @@ export default function WorkspaceBar({
 
   return (
     <div className="flex flex-col items-center w-16 bg-zinc-900 py-3 gap-2 flex-shrink-0">
+      {/* Logo */}
+      <div className="w-10 h-10 flex items-center justify-center ml-3">
+        <Logo className="h-7 w-7" />
+      </div>
+
       {/* Settings gear */}
       <button
         onClick={onOpenSettings}
@@ -113,7 +120,7 @@ export default function WorkspaceBar({
       </button>
 
       {/* Separator */}
-      <div className="w-8 h-px bg-zinc-700 my-1" />
+      {hasVisiblePlugins && <div className="w-8 h-px bg-zinc-700 my-1" />}
 
       {/* Plugin icons */}
       {enabledPlugins.includes("git") && (

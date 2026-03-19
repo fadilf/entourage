@@ -239,7 +239,7 @@ export async function POST(
               finalContent = parsed.cleaned;
               inlineSuggestions = parsed.suggestions;
               // Also clean the last text block
-              if (parsed.suggestions.length > 0) {
+              if (parsed.cleaned !== accumulatedContent) {
                 const lastBlock = accumulatedBlocks[accumulatedBlocks.length - 1];
                 if (lastBlock && lastBlock.type === "text") {
                   const blockParsed = parseQuickReplies(lastBlock.text);

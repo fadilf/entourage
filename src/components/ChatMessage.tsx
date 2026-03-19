@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Message } from "@/lib/types";
+import { parseQuickReplies } from "@/lib/quick-replies";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -33,8 +34,8 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   };
 
   return (
-    <div className="group/code relative my-2 rounded-lg bg-zinc-900 text-zinc-100">
-      <div className="flex items-center justify-between px-3 py-1.5 text-xs text-zinc-400">
+    <div className="group/code relative my-1.5 rounded-lg bg-zinc-900 text-zinc-100">
+      <div className="flex items-center justify-between px-3 py-1 text-[11px] text-zinc-400">
         <span>{language}</span>
         <button
           onClick={handleCopy}
@@ -47,7 +48,7 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
           )}
         </button>
       </div>
-      <pre className="overflow-x-auto px-3 pb-3 text-xs font-mono leading-relaxed">
+      <pre className="overflow-x-auto px-3 pb-2.5 text-xs font-mono leading-snug">
         <code>{code}</code>
       </pre>
     </div>
@@ -58,25 +59,25 @@ function MarkdownBlock({ content, isStreaming }: { content: string; isStreaming?
   if (!content && isStreaming) return null;
   if (!content) return null;
   return (
-    <div className="slack-markdown text-sm leading-relaxed text-zinc-900 dark:text-zinc-100">
+    <div className="chat-markdown text-[13px] leading-normal text-zinc-900 dark:text-zinc-100">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         components={{
           h1: ({ children }) => (
-            <h1 className="text-base font-bold mt-4 mb-1.5 first:mt-0">{children}</h1>
+            <h1 className="text-sm font-bold mt-3 mb-1 first:mt-0">{children}</h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-sm font-bold mt-4 mb-1.5 first:mt-0">{children}</h2>
+            <h2 className="text-[13px] font-bold mt-3 mb-1 first:mt-0">{children}</h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-sm font-semibold mt-3 mb-1 first:mt-0">{children}</h3>
+            <h3 className="text-[13px] font-semibold mt-2 mb-0.5 first:mt-0">{children}</h3>
           ),
-          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+          p: ({ children }) => <p className="mb-1.5 last:mb-0">{children}</p>,
           ul: ({ children }) => (
-            <ul className="list-disc pl-5 mb-2 last:mb-0 space-y-0.5">{children}</ul>
+            <ul className="list-disc pl-4 mb-1.5 last:mb-0 space-y-0">{children}</ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal pl-5 mb-2 last:mb-0 space-y-0.5">{children}</ol>
+            <ol className="list-decimal pl-4 mb-1.5 last:mb-0 space-y-0">{children}</ol>
           ),
           li: ({ children }) => <li>{children}</li>,
           a: ({ href, children }) => (
@@ -90,7 +91,7 @@ function MarkdownBlock({ content, isStreaming }: { content: string; isStreaming?
             </a>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 pl-3 py-1 my-2 text-zinc-600 dark:text-zinc-400 italic">
+            <blockquote className="border-l-2 border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 pl-2.5 py-0.5 my-1.5 text-zinc-600 dark:text-zinc-400 italic">
               {children}
             </blockquote>
           ),
@@ -109,7 +110,7 @@ function MarkdownBlock({ content, isStreaming }: { content: string; isStreaming?
           tr: ({ children }) => (
             <tr className="even:bg-zinc-50 dark:even:bg-zinc-800">{children}</tr>
           ),
-          hr: () => <hr className="my-3 border-zinc-200 dark:border-zinc-700" />,
+          hr: () => <hr className="my-2 border-zinc-200 dark:border-zinc-700" />,
           strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
           pre: ({ children }) => <>{children}</>,
           code: ({ className, children }) => {
@@ -118,7 +119,7 @@ function MarkdownBlock({ content, isStreaming }: { content: string; isStreaming?
 
             if (!isBlock) {
               return (
-                <code className="bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded px-1.5 py-0.5 text-xs font-mono">
+                <code className="bg-zinc-200/70 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-md px-1.5 py-0.5 text-[12px] font-mono">
                   {children}
                 </code>
               );
@@ -137,19 +138,34 @@ function MarkdownBlock({ content, isStreaming }: { content: string; isStreaming?
   );
 }
 
-export default function SlackMessage({
+export default function ChatMessage({
   message,
   isUser,
+  onContextMenu,
 }: {
   message: Message;
   isUser: boolean;
+  onContextMenu?: (message: Message, x: number, y: number) => void;
 }) {
   const wsParam = useWsParam();
   const isError = message.status === "error";
   const isStreaming = message.status === "streaming";
+  const sanitizedContent = !isUser ? parseQuickReplies(message.content || "").cleaned : (message.content || "");
+  const sanitizedBlocks = !isUser && message.contentBlocks
+    ? message.contentBlocks.map((block) =>
+        block.type === "text" ? { ...block, text: parseQuickReplies(block.text).cleaned } : block
+      )
+    : message.contentBlocks;
 
   return (
-    <div className="group relative py-0.5 px-1 -mx-1 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800">
+    <div
+      className="group relative py-0.5 px-1 -mx-1 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800"
+      onContextMenu={(e) => {
+        if (!onContextMenu) return;
+        e.preventDefault();
+        onContextMenu(message, e.clientX, e.clientY);
+      }}
+    >
       {/* Hover timestamp */}
       <div className="absolute right-2 top-1 hidden text-[11px] text-zinc-400 group-hover:block">
         {new Date(message.timestamp).toLocaleTimeString([], {
@@ -166,16 +182,16 @@ export default function SlackMessage({
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          <span>{message.content || "An error occurred"}</span>
+          <span>{sanitizedContent || "An error occurred"}</span>
         </div>
       ) : isUser ? (
-        <div className="text-sm leading-relaxed text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap">
-          {renderMentions(message.content || "")}
+        <div className="text-[13px] leading-normal text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap">
+          {renderMentions(sanitizedContent)}
         </div>
-      ) : message.contentBlocks && message.contentBlocks.length > 0 ? (
+      ) : sanitizedBlocks && sanitizedBlocks.length > 0 ? (
         /* Interleaved content blocks — tool calls rendered in-place */
         <>
-          {message.contentBlocks.map((block, i) =>
+          {sanitizedBlocks.map((block, i) =>
             block.type === "tool_call" ? (
               <ToolCallBlock key={block.toolCall.id} toolCall={block.toolCall} />
             ) : (
@@ -193,7 +209,7 @@ export default function SlackMessage({
               ))}
             </div>
           )}
-          <MarkdownBlock content={message.content} isStreaming={isStreaming} />
+          <MarkdownBlock content={sanitizedContent} isStreaming={isStreaming} />
         </>
       )}
 
@@ -218,7 +234,7 @@ export default function SlackMessage({
       )}
 
       {/* Streaming states */}
-      {isStreaming && !message.content && (
+      {isStreaming && !sanitizedContent && (
         <span className="text-xs text-zinc-400 italic">{message.isReattach ? "Reconnecting..." : "Thinking..."}</span>
       )}
     </div>

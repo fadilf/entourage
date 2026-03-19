@@ -20,6 +20,8 @@ export default function MessageInput({
   disabled,
   isMobile,
   onDraftChange,
+  showTopBorder = true,
+  compactTopPadding = false,
 }: {
   agents: Agent[];
   allAgents?: Agent[];
@@ -28,6 +30,8 @@ export default function MessageInput({
   disabled?: boolean;
   isMobile?: boolean;
   onDraftChange?: (hasText: boolean) => void;
+  showTopBorder?: boolean;
+  compactTopPadding?: boolean;
 }) {
   const wsParam = useWsParam();
   const [content, setContent] = useState("");
@@ -201,7 +205,13 @@ export default function MessageInput({
 
   return (
     <div
-      className={`relative border-t border-zinc-200 dark:border-zinc-700 ${isMobile ? "px-4" : "px-6"} py-4 ${isDragOver ? "bg-violet-50 dark:bg-violet-900/20" : ""}`}
+      className={`relative ${
+        showTopBorder
+          ? "border-t border-zinc-200 dark:border-zinc-700 py-4"
+          : compactTopPadding
+            ? "pt-2 pb-4"
+            : "py-3"
+      } ${isMobile ? "px-4" : "px-6"} ${isDragOver ? "bg-violet-50 dark:bg-violet-900/20" : ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

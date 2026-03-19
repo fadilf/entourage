@@ -36,13 +36,13 @@ export default function MessageList({
   messages: Message[];
   agents: Agent[];
   displayName?: string;
-  onContextMenu?: (messageId: string, groupText: string, x: number, y: number) => void;
+  onContextMenu?: (message: Message, x: number, y: number) => void;
 }) {
   const groups = groupMessages(messages);
 
   return (
     <>
-      {groups.map((group, i) => {
+      {groups.map((group) => {
         const isUser = group.senderId === "user";
         const agent = isUser
           ? undefined
