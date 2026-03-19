@@ -44,9 +44,7 @@ export default function ThreadDetail({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editTitle, setEditTitle] = useState("");
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; message: Message } | null>(null);
   const [rewindConfirm, setRewindConfirm] = useState<string | null>(null);
 
@@ -123,53 +121,49 @@ export default function ThreadDetail({
               <ChevronLeft className="h-5 w-5" />
             </button>
           )}
-          {isEditingTitle ? (
-            <input
-              ref={titleInputRef}
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              onBlur={() => {
-                const trimmed = editTitle.trim();
-                if (trimmed && trimmed !== thread.title) {
-                  onRenameThread?.(trimmed);
-                }
-                setIsEditingTitle(false);
+          <h2
+            ref={titleRef}
+            contentEditable
+            suppressContentEditableWarning
+            spellCheck={false}
+            className={`text-lg font-semibold text-zinc-900 dark:text-zinc-100 outline-none ${isMobile ? "truncate" : "cursor-pointer hover:text-zinc-600 dark:hover:text-zinc-300"} focus:cursor-text focus:hover:text-zinc-900 dark:focus:hover:text-zinc-100`}
+            onBlur={(e) => {
+              const trimmed = (e.currentTarget.textContent || "").trim();
+              if (trimmed && trimmed !== thread.title) {
+                onRenameThread?.(trimmed);
+              } else {
+                e.currentTarget.textContent = thread.title;
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.blur();
+              } else if (e.key === "Escape") {
+                e.currentTarget.textContent = thread.title;
+                e.currentTarget.blur();
+              }
+            }}
+            title={isMobile ? undefined : "Double-click to rename"}
+          >
+            {thread.title}
+          </h2>
+          {isMobile && (
+            <button
+              onClick={() => {
+                const el = titleRef.current;
+                if (!el) return;
+                el.focus();
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                const sel = window.getSelection();
+                sel?.removeAllRanges();
+                sel?.addRange(range);
               }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  (e.target as HTMLInputElement).blur();
-                } else if (e.key === "Escape") {
-                  setIsEditingTitle(false);
-                }
-              }}
-              className="w-full rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-sm font-medium text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-400"
-            />
-          ) : (
-            <>
-              <h2
-                className={`text-lg font-semibold text-zinc-900 dark:text-zinc-100 ${isMobile ? "truncate" : "cursor-pointer hover:text-zinc-600 dark:hover:text-zinc-300"}`}
-                onDoubleClick={isMobile ? undefined : () => {
-                  setEditTitle(thread.title);
-                  setIsEditingTitle(true);
-                  setTimeout(() => titleInputRef.current?.select(), 0);
-                }}
-                title={isMobile ? undefined : "Double-click to rename"}
-              >
-                {thread.title}
-              </h2>
-              {isMobile && (
-                <button
-                  onClick={() => {
-                    setEditTitle(thread.title);
-                    setIsEditingTitle(true);
-                    setTimeout(() => titleInputRef.current?.select(), 0);
-                  }}
-                  className="shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </>
+              className="shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
       </div>
