@@ -238,6 +238,46 @@ export async function addAgentsToThread(workspaceDir: string, threadId: string, 
   });
 }
 
+export async function syncThreadAgents(
+  workspaceDir: string,
+  threadId: string,
+  agents: Agent[],
+  activeAgentId?: string
+): Promise<{ thread: ThreadWithMessages | null; changed: boolean }> {
+  return withLock(threadId, async () => {
+    const thread = await getThread(workspaceDir, threadId);
+    if (!thread) return { thread: null, changed: false };
+
+    const originalOrder = thread.agents.map((agent) => agent.id);
+    const existingIds = new Set(originalOrder);
+    const toAdd = agents.filter((agent) => !existingIds.has(agent.id));
+
+    if (toAdd.length > 0) {
+      thread.agents.push(...toAdd);
+    }
+
+    if (activeAgentId) {
+      const activeIndex = thread.agents.findIndex((agent) => agent.id === activeAgentId);
+      if (activeIndex > 0) {
+        const [activeAgent] = thread.agents.splice(activeIndex, 1);
+        thread.agents.unshift(activeAgent);
+      }
+    }
+
+    const changed =
+      toAdd.length > 0 ||
+      thread.agents.some((agent, index) => agent.id !== originalOrder[index]);
+
+    if (!changed) {
+      return { thread, changed: false };
+    }
+
+    thread.updatedAt = new Date().toISOString();
+    await writeFile(getThreadPath(workspaceDir, threadId), JSON.stringify(thread, null, 2));
+    return { thread, changed: true };
+  });
+}
+
 function finalizeRetainedMessages(messages: Message[]): void {
   for (const msg of messages) {
     if (msg.status === "streaming") {
