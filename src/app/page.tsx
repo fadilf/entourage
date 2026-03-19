@@ -511,7 +511,7 @@ export default function Home() {
 
   if (workspaces.length === 0) {
     return (
-      <div className="flex h-screen overflow-hidden bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+      <div className="flex h-dvh overflow-hidden bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
         <AddWorkspaceDialog
           open
           inline
@@ -524,7 +524,7 @@ export default function Home() {
 
   return (
     <WorkspaceProvider workspaceId={activeWorkspaceId}>
-    <div className="flex h-screen overflow-hidden bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+    <div className="flex h-dvh overflow-hidden bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
       {isMobile ? (
         selectedThreadId ? threadDetailEl : threadListEl
       ) : (

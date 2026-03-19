@@ -279,7 +279,7 @@ export default function MessageInput({
           <Paperclip className="h-5 w-5" />
         </button>
 
-        <div className="relative flex-1">
+        <div className="relative flex-1 flex items-end">
           <textarea
             ref={textareaRef}
             value={content}
