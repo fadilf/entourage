@@ -183,7 +183,7 @@ export async function updateMessage(
   workspaceDir: string,
   threadId: string,
   messageId: string,
-  updates: Partial<Pick<Message, "content" | "status" | "toolCalls" | "contentBlocks">>
+  updates: Partial<Pick<Message, "content" | "status" | "toolCalls" | "contentBlocks" | "suggestions">>
 ): Promise<void> {
   return withLock(threadId, async () => {
     const raw = await readFile(getThreadPath(workspaceDir, threadId), "utf-8");
@@ -194,6 +194,7 @@ export async function updateMessage(
     if (updates.status !== undefined) msg.status = updates.status;
     if (updates.toolCalls !== undefined) msg.toolCalls = updates.toolCalls;
     if (updates.contentBlocks !== undefined) msg.contentBlocks = updates.contentBlocks;
+    if (updates.suggestions !== undefined) msg.suggestions = updates.suggestions;
     thread.updatedAt = new Date().toISOString();
     await writeFile(getThreadPath(workspaceDir, threadId), JSON.stringify(thread, null, 2));
   });
@@ -237,6 +238,15 @@ export async function addAgentsToThread(workspaceDir: string, threadId: string, 
   });
 }
 
+function finalizeRetainedMessages(messages: Message[]): void {
+  for (const msg of messages) {
+    if (msg.status === "streaming") {
+      msg.status = "error";
+      msg.content += "\n\n[Stream interrupted]";
+    }
+  }
+}
+
 export async function truncateAfterMessage(
   workspaceDir: string,
   threadId: string,
@@ -250,14 +260,28 @@ export async function truncateAfterMessage(
     if (index === -1) return null;
 
     thread.messages = thread.messages.slice(0, index + 1);
+    finalizeRetainedMessages(thread.messages);
 
-    // Fix any stale streaming messages at or before the truncation point
-    for (const msg of thread.messages) {
-      if (msg.status === "streaming") {
-        msg.status = "error";
-        msg.content += "\n\n[Stream interrupted]";
-      }
-    }
+    thread.updatedAt = new Date().toISOString();
+    await writeFile(getThreadPath(workspaceDir, threadId), JSON.stringify(thread, null, 2));
+    return thread;
+  });
+}
+
+export async function truncateBeforeMessage(
+  workspaceDir: string,
+  threadId: string,
+  messageId: string
+): Promise<ThreadWithMessages | null> {
+  return withLock(threadId, async () => {
+    const raw = await readFile(getThreadPath(workspaceDir, threadId), "utf-8");
+    const thread = JSON.parse(raw) as ThreadWithMessages;
+
+    const index = thread.messages.findIndex((m) => m.id === messageId);
+    if (index === -1) return null;
+
+    thread.messages = thread.messages.slice(0, index);
+    finalizeRetainedMessages(thread.messages);
 
     thread.updatedAt = new Date().toISOString();
     await writeFile(getThreadPath(workspaceDir, threadId), JSON.stringify(thread, null, 2));
@@ -276,4 +300,3 @@ export async function deleteThread(workspaceDir: string, threadId: string): Prom
 function generateId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
-

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ThreadWithMessages, Agent, Message, MessageImage } from "@/lib/types";
-import { ChevronLeft, Copy, Pencil, RotateCcw } from "lucide-react";
+import { ChevronLeft, Copy, Pencil, RotateCcw, Send } from "lucide-react";
 import Dialog from "./Dialog";
 import MessageList from "./MessageList";
 import ModelIcon from "./ModelIcon";
@@ -22,6 +22,7 @@ export default function ThreadDetail({
   isMobile,
   onBack,
   onRewind,
+  onResendMessage,
   suggestions,
   suggestionsLoading,
   onSuggestionSelect,
@@ -37,7 +38,8 @@ export default function ThreadDetail({
   displayName?: string;
   isMobile?: boolean;
   onBack?: () => void;
-  onRewind?: (messageId: string) => void;
+  onRewind?: (messageId: string, options?: { keepMessage?: boolean }) => void;
+  onResendMessage?: (message: Message) => void;
   suggestions?: string[];
   suggestionsLoading?: boolean;
   onSuggestionSelect?: (text: string) => void;
@@ -48,7 +50,7 @@ export default function ThreadDetail({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; messageId: string; groupText: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; message: Message } | null>(null);
   const [rewindConfirm, setRewindConfirm] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,8 +76,8 @@ export default function ThreadDetail({
     }
   }, [thread?.messages.length, streamingContentKey]);
 
-  const handleContextMenu = useCallback((messageId: string, groupText: string, x: number, y: number) => {
-    setContextMenu({ x, y, messageId, groupText });
+  const handleContextMenu = useCallback((message: Message, x: number, y: number) => {
+    setContextMenu({ x, y, message });
   }, []);
 
   if (!thread) {
@@ -110,6 +112,7 @@ export default function ThreadDetail({
     (m) => !(m.status === "streaming" && m.agentId && streamingAgentIds.has(m.agentId))
   );
   const allMessages = [...filteredMessages, ...streamingMsgs];
+  const hasQuickReplies = (suggestions?.length ?? 0) > 0 || !!suggestionsLoading;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -198,21 +201,26 @@ export default function ThreadDetail({
           onContextMenu={handleContextMenu}
         />
       </div>
-      <QuickReplies
-        suggestions={suggestions ?? []}
-        loading={suggestionsLoading ?? false}
-        onSelect={(text) => onSuggestionSelect?.(text)}
-      />
-      <MessageInput
-        key={thread.id}
-        agents={thread.agents}
-        allAgents={allAgents}
-        onSendMessage={onSendMessage}
-        onStop={onStop}
-        disabled={isStreaming}
-        isMobile={isMobile}
-        onDraftChange={onDraftChange}
-      />
+      <div className="border-t border-zinc-200 dark:border-zinc-700">
+        <QuickReplies
+          suggestions={suggestions ?? []}
+          loading={suggestionsLoading ?? false}
+          onSelect={(text) => onSuggestionSelect?.(text)}
+          className={`${isMobile ? "px-4" : "px-6"} pt-2 pb-0.5`}
+        />
+        <MessageInput
+          key={thread.id}
+          agents={thread.agents}
+          allAgents={allAgents}
+          onSendMessage={onSendMessage}
+          onStop={onStop}
+          disabled={isStreaming}
+          isMobile={isMobile}
+          onDraftChange={onDraftChange}
+          showTopBorder={false}
+          compactTopPadding={hasQuickReplies}
+        />
+      </div>
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}
@@ -222,12 +230,21 @@ export default function ThreadDetail({
             {
               label: "Copy message",
               icon: <Copy className="h-4 w-4" />,
-              onClick: () => navigator.clipboard.writeText(contextMenu.groupText),
+              onClick: () => navigator.clipboard.writeText(contextMenu.message.content),
             },
+            ...(contextMenu.message.role === "user"
+              ? [{
+                  label: "Re-send message",
+                  icon: <Send className="h-4 w-4" />,
+                  onClick: () => onResendMessage?.(contextMenu.message),
+                  disabled: isStreaming,
+                  disabledReason: "Can't re-send while an agent is running",
+                }]
+              : []),
             {
               label: "Rewind messages to here",
               icon: <RotateCcw className="h-4 w-4" />,
-              onClick: () => setRewindConfirm(contextMenu.messageId),
+              onClick: () => setRewindConfirm(contextMenu.message.id),
               disabled: isStreaming,
               disabledReason: "Can't rewind while an agent is running",
             },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
-import { ThreadListItem, ThreadWithMessages, ThreadProcess, Agent, MessageImage, Workspace, Icon } from "@/lib/types";
+import { ThreadListItem, ThreadWithMessages, ThreadProcess, Agent, Message, MessageImage, Workspace, Icon } from "@/lib/types";
 import { useAgentStream } from "@/hooks/useSSE";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import ThreadList from "@/components/ThreadList";
@@ -268,19 +268,27 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedThread?.id, reattach]);
 
-  // Restore persisted suggestions on thread switch (or clear if none)
+  // Restore persisted suggestions once when a thread first loads
+  const lastRestoredThreadId = useRef<string | null>(null);
+
+  // Clear suggestions on thread switch
   useEffect(() => {
     suggestionsAbortRef.current?.abort();
+    setSuggestions([]);
     setSuggestionsLoading(false);
-    if (selectedThread) {
-      const lastAssistant = [...selectedThread.messages]
-        .reverse()
-        .find((m) => m.role === "assistant" && m.status === "complete");
-      setSuggestions(lastAssistant?.suggestions ?? []);
-    } else {
-      setSuggestions([]);
+    lastRestoredThreadId.current = null;
+  }, [selectedThreadId]);
+  useEffect(() => {
+    if (!selectedThread || lastRestoredThreadId.current === selectedThread.id) return;
+    lastRestoredThreadId.current = selectedThread.id;
+    const lastAssistant = [...selectedThread.messages]
+      .reverse()
+      .find((m) => m.role === "assistant" && m.status === "complete");
+    const persisted = lastAssistant?.suggestions ?? [];
+    if (persisted.length > 0) {
+      setSuggestions(persisted);
     }
-  }, [selectedThreadId, selectedThread]);
+  }, [selectedThread]);
 
   const handleDraftChange = useCallback((hasText: boolean) => {
     if (hasText) {
@@ -394,12 +402,9 @@ export default function Home() {
     []
   );
 
-  const handleSendMessage = useCallback(
+  const sendUserMessage = useCallback(
     async (content: string, images?: MessageImage[]) => {
-      suggestionsAbortRef.current?.abort();
-      setSuggestions([]);
-      setSuggestionsLoading(false);
-      if (!selectedThreadId || !selectedThread) return;
+      if (!selectedThreadId) return false;
 
       const res = await fetch(wsUrl(`/api/threads/${selectedThreadId}/messages`), {
         method: "POST",
@@ -407,7 +412,7 @@ export default function Home() {
         body: JSON.stringify({ content, ...(images && images.length > 0 ? { images } : {}) }),
       });
 
-      if (!res.ok) return;
+      if (!res.ok) return false;
 
       const { message, targetAgents, threadUpdated } = await res.json();
 
@@ -423,8 +428,19 @@ export default function Home() {
 
       // Start streaming for target agents
       sendMessage(content, targetAgents, images);
+      return true;
     },
-    [selectedThreadId, selectedThread, sendMessage, setSelectedThread, refetchThread, wsUrl]
+    [selectedThreadId, sendMessage, setSelectedThread, refetchThread, wsUrl]
+  );
+
+  const handleSendMessage = useCallback(
+    async (content: string, images?: MessageImage[]) => {
+      suggestionsAbortRef.current?.abort();
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+      await sendUserMessage(content, images);
+    },
+    [sendUserMessage]
   );
 
   const handleRenameThread = useCallback(
@@ -459,20 +475,44 @@ export default function Home() {
     [refetchThreads, selectedThreadId, wsUrl]
   );
 
-  const handleRewind = useCallback(
-    async (messageId: string) => {
+  const rewindThread = useCallback(
+    async (messageId: string, keepMessage = true) => {
       if (!selectedThreadId) return;
       const res = await fetch(wsUrl(`/api/threads/${selectedThreadId}/rewind`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageId }),
+        body: JSON.stringify({ messageId, keepMessage }),
       });
-      if (!res.ok) return;
+      if (!res.ok) return null;
       const updated = await res.json();
       setSelectedThread(updated);
       refetchThreads();
+      return updated as ThreadWithMessages;
     },
     [selectedThreadId, setSelectedThread, refetchThreads, wsUrl]
+  );
+
+  const handleRewind = useCallback(
+    async (messageId: string, options?: { keepMessage?: boolean }) => {
+      await rewindThread(messageId, options?.keepMessage ?? true);
+    },
+    [rewindThread]
+  );
+
+  const handleResendMessage = useCallback(
+    async (message: Message) => {
+      if (message.role !== "user") return;
+
+      suggestionsAbortRef.current?.abort();
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+
+      const rewound = await rewindThread(message.id, false);
+      if (!rewound) return;
+
+      await sendUserMessage(message.content, message.images);
+    },
+    [rewindThread, sendUserMessage]
   );
 
   const handleThreadCreated = useCallback(
@@ -506,6 +546,7 @@ export default function Home() {
       onStop={stopAgent}
       onRenameThread={handleRenameThread}
       onRewind={handleRewind}
+      onResendMessage={handleResendMessage}
       isStreaming={isStreaming}
       allAgents={agents}
       displayName={displayName}

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getProcessManager } from "@/lib/process-manager";
-import { getThread, truncateAfterMessage } from "@/lib/thread-store";
+import { getThread, truncateAfterMessage, truncateBeforeMessage } from "@/lib/thread-store";
 import { resolveWorkspaceDir } from "@/lib/workspace-context";
 
 export async function POST(
@@ -8,7 +8,10 @@ export async function POST(
   { params }: { params: Promise<{ threadId: string }> }
 ) {
   const { threadId } = await params;
-  const { messageId } = (await request.json()) as { messageId: string };
+  const { messageId, keepMessage = true } = (await request.json()) as {
+    messageId: string;
+    keepMessage?: boolean;
+  };
 
   if (!messageId) {
     return NextResponse.json({ error: "messageId required" }, { status: 400 });
@@ -34,7 +37,9 @@ export async function POST(
   // Reset session IDs for ALL agents so CLI starts fresh sessions (not continuing old on-disk ones)
   pm.resetSessions(threadId, currentThread.agents.map((a) => a.id));
 
-  const thread = await truncateAfterMessage(workspaceDir, threadId, messageId);
+  const thread = keepMessage
+    ? await truncateAfterMessage(workspaceDir, threadId, messageId)
+    : await truncateBeforeMessage(workspaceDir, threadId, messageId);
   if (!thread) {
     return NextResponse.json({ error: "Thread or message not found" }, { status: 404 });
   }
