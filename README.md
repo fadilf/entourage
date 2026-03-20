@@ -116,7 +116,7 @@ Run Entourage on your laptop or a VPS, then pick up where you left off from your
 
 Enable [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) to expose it through a public HTTPS URL. Since Entourage includes a web app manifest and installable PWA support, opening that URL on your phone lets you install it as a standalone app.
 
-![Desktop and mobile side by side](docs/screenshots/desktop-mobile.png)
+![Mobile view](docs/screenshots/mobile.png)
 
 ### Install Globally
 
