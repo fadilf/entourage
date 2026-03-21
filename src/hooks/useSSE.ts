@@ -55,7 +55,7 @@ export function useAgentStream(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (tid: string, agentId: string, event: any): string | null => {
       const threadStreams = allStreams.current.get(tid);
-      if (!threadStreams) return event.type === "done";
+      if (!threadStreams) return null;
       const existing = threadStreams.get(agentId);
 
       switch (event.type) {
