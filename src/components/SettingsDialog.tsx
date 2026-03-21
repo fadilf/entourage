@@ -1,44 +1,23 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Agent, AgentModel, Icon, PermissionLevel } from "@/lib/types";
-import { PLUGINS } from "@/lib/plugins";
+import { Agent, PermissionLevel } from "@/lib/types";
 import Dialog from "./Dialog";
-import ModelIcon from "./ModelIcon";
-import IconPicker from "./IconPicker";
-import { ArrowLeft, ChevronRight, GripVertical, Pencil, Trash2, Sun, Moon, ShieldCheck, Shield, ShieldAlert } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useWorkspaceId } from "@/contexts/WorkspaceContext";
-
-const PERMISSION_LEVELS: { value: PermissionLevel; label: string; description: string; icon: typeof ShieldCheck }[] = [
-  { value: "supervised", label: "Supervised", description: "Read-only — agents can't write files or run commands", icon: ShieldAlert },
-  { value: "auto-edit", label: "Auto-Edit", description: "File edits allowed, shell commands blocked", icon: Shield },
-  { value: "full", label: "Full Autonomy", description: "All actions allowed (current default)", icon: ShieldCheck },
-];
-
-type AgentFormData = {
-  name: string;
-  model: AgentModel;
-  avatarColor: string;
-  icon?: Icon;
-  personality?: string;
-};
-
-const COLOR_PRESETS = [
-  "#d97706", "#3b82f6", "#10b981", "#ef4444", "#8b5cf6",
-  "#ec4899", "#f59e0b", "#06b6d4", "#6366f1", "#14b8a6",
-  "#f97316", "#84cc16",
-];
-
-const emptyForm: AgentFormData = {
-  name: "",
-  model: "claude",
-  avatarColor: "#8b5cf6",
-};
-
-type McpServer = { id: string; name: string; command?: string; args?: string[]; url?: string; transport: string; connected: boolean; appToolCount: number };
-
-type Tab = "general" | "agents" | "plugins" | "mcp";
+import AgentFormPanel from "./settings-dialog/AgentFormPanel";
+import AgentProfilesPanel from "./settings-dialog/AgentProfilesPanel";
+import GeneralSettingsPanel from "./settings-dialog/GeneralSettingsPanel";
+import McpServersPanel from "./settings-dialog/McpServersPanel";
+import PluginsPanel from "./settings-dialog/PluginsPanel";
+import SettingsDialogHeader from "./settings-dialog/SettingsDialogHeader";
+import {
+  EMPTY_AGENT_FORM,
+  type AgentFormData,
+  type CreateMcpServerInput,
+  type McpServer,
+  type Tab,
+} from "./settings-dialog/types";
 
 export default function SettingsDialog({
   open,
@@ -51,7 +30,7 @@ export default function SettingsDialog({
   const [agents, setAgents] = useState<Agent[]>([]);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [form, setForm] = useState<AgentFormData>(emptyForm);
+  const [form, setForm] = useState<AgentFormData>(EMPTY_AGENT_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const { resolvedTheme, setTheme } = useTheme();
@@ -62,14 +41,17 @@ export default function SettingsDialog({
   const [plugins, setPlugins] = useState<Record<string, boolean>>({});
   const [quickRepliesEnabled, setQuickRepliesEnabled] = useState(false);
   const [toolCallGroupingEnabled, setToolCallGroupingEnabled] = useState(false);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
-  const [mcpForm, setMcpForm] = useState({ name: "", url: "", command: "", args: "" });
-  const [mcpAdding, setMcpAdding] = useState(false);
-  const [mcpAdvanced, setMcpAdvanced] = useState(false);
   const workspaceId = useWorkspaceId();
   const [wsPermissionLevel, setWsPermissionLevel] = useState<PermissionLevel>("full");
+
+  const patchConfig = useCallback(async (body: Record<string, unknown>) => {
+    return fetch("/api/config", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }, []);
 
   const fetchAgents = useCallback(async () => {
     const res = await fetch(`/api/agents`);
@@ -117,11 +99,7 @@ export default function SettingsDialog({
   }, [open, fetchAgents, fetchConfig, fetchMcpServers, fetchWorkspacePermission]);
 
   const handleSaveDisplayName = async () => {
-    const res = await fetch(`/api/config`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ displayName }),
-    });
+    const res = await patchConfig({ displayName });
     if (res.ok) {
       const data = await res.json();
       setSavedDisplayName(data.displayName);
@@ -132,7 +110,7 @@ export default function SettingsDialog({
   const showForm = editingAgent !== null || isCreating;
 
   const startCreate = () => {
-    setForm(emptyForm);
+    setForm({ ...EMPTY_AGENT_FORM });
     setEditingAgent(null);
     setIsCreating(true);
     setError("");
@@ -216,539 +194,145 @@ export default function SettingsDialog({
     }
   };
 
+  const handleFormUpdate = (patch: Partial<AgentFormData>) => {
+    setForm((current) => ({ ...current, ...patch }));
+  };
+
+  const handleTabChange = (nextTab: Tab) => {
+    setTab(nextTab);
+    setError("");
+  };
+
+  const handleToggleQuickReplies = async () => {
+    const next = !quickRepliesEnabled;
+    setQuickRepliesEnabled(next);
+    await patchConfig({ quickRepliesEnabled: next });
+  };
+
+  const handleToggleToolCallGrouping = async () => {
+    const next = !toolCallGroupingEnabled;
+    setToolCallGroupingEnabled(next);
+    await patchConfig({ toolCallGroupingEnabled: next });
+  };
+
+  const handlePermissionLevelChange = async (value: PermissionLevel) => {
+    setWsPermissionLevel(value);
+    if (workspaceId) {
+      await fetch(`/api/workspaces/${workspaceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ permissionLevel: value }),
+      });
+    }
+  };
+
+  const handleReorderAgents = async (orderedIds: string[]) => {
+    setAgents((current) => orderedIds.map((id) => current.find((agent) => agent.id === id)).filter(Boolean) as Agent[]);
+    await fetch("/api/agents/reorder", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderedIds }),
+    });
+  };
+
+  const handleTogglePlugin = async (pluginId: string, enabled: boolean) => {
+    const updated = { ...plugins, [pluginId]: !enabled };
+    setPlugins(updated);
+    await patchConfig({ plugins: updated });
+  };
+
+  const handleAddMcpServer = async (server: CreateMcpServerInput) => {
+    await fetch("/api/mcp-servers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(server),
+    });
+    await fetchMcpServers();
+  };
+
+  const handleDeleteMcpServer = async (serverId: string) => {
+    await fetch(`/api/mcp-servers/${serverId}`, { method: "DELETE" });
+    await fetchMcpServers();
+  };
+
+  const renderContent = () => {
+    if (showForm) {
+      return (
+        <AgentFormPanel
+          form={form}
+          error={error}
+          saving={saving}
+          editingAgentName={editingAgent?.name}
+          onUpdate={handleFormUpdate}
+          onCancel={cancelForm}
+          onSave={handleSave}
+        />
+      );
+    }
+
+    switch (tab) {
+      case "general":
+        return (
+          <GeneralSettingsPanel
+            mounted={mounted}
+            resolvedTheme={resolvedTheme}
+            displayName={displayName}
+            savedDisplayName={savedDisplayName}
+            quickRepliesEnabled={quickRepliesEnabled}
+            toolCallGroupingEnabled={toolCallGroupingEnabled}
+            wsPermissionLevel={wsPermissionLevel}
+            onToggleTheme={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+            onDisplayNameChange={setDisplayName}
+            onSaveDisplayName={handleSaveDisplayName}
+            onToggleQuickReplies={handleToggleQuickReplies}
+            onToggleToolCallGrouping={handleToggleToolCallGrouping}
+            onPermissionLevelChange={handlePermissionLevelChange}
+          />
+        );
+      case "agents":
+        return (
+          <AgentProfilesPanel
+            agents={agents}
+            error={error}
+            onStartCreate={startCreate}
+            onStartEdit={startEdit}
+            onDelete={handleDelete}
+            onReorder={handleReorderAgents}
+          />
+        );
+      case "plugins":
+        return (
+          <PluginsPanel
+            plugins={plugins}
+            onTogglePlugin={handleTogglePlugin}
+          />
+        );
+      case "mcp":
+        return (
+          <McpServersPanel
+            mcpServers={mcpServers}
+            onAddServer={handleAddMcpServer}
+            onDeleteServer={handleDeleteMcpServer}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Dialog open={open} onClose={onClose}>
       <div className="flex w-full max-w-2xl flex-col rounded-xl bg-white dark:bg-zinc-800 shadow-xl mx-4" style={{ maxHeight: "85vh" }}>
-        {/* Header */}
-        <div className="border-b border-zinc-200 dark:border-zinc-700 px-4 md:px-6">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3">
-              {showForm && (
-                <button onClick={cancelForm} className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
-                  <ArrowLeft className="h-4 w-4" />
-                </button>
-              )}
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                {showForm
-                  ? editingAgent
-                    ? `Edit ${editingAgent.name}`
-                    : "New Agent"
-                  : "Settings"}
-              </h3>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 text-xl leading-none"
-            >
-              &times;
-            </button>
-          </div>
-          {!showForm && (
-            <div className="flex gap-1 -mb-px">
-              {([["general", "General"], ["agents", "Agent Profiles"], ["plugins", "Plugins"], ["mcp", "MCP Servers"]] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => { setTab(key); setError(""); }}
-                  className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    tab === key
-                      ? "border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100"
-                      : "border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Content */}
+        <SettingsDialogHeader
+          showForm={showForm}
+          editingAgentName={editingAgent?.name}
+          tab={tab}
+          onTabChange={handleTabChange}
+          onBack={cancelForm}
+          onClose={onClose}
+        />
         <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
-          {showForm ? (
-            <div className="space-y-4">
-              {error && (
-                <div className="rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800">
-                  {error}
-                </div>
-              )}
-
-              {/* Name */}
-              <div>
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Name</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Joker"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  autoFocus
-                />
-              </div>
-
-              {/* Model */}
-              <div>
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Model</label>
-                <div className="mt-1 flex gap-1">
-                  {(["claude", "gemini", "codex"] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, model: m }))}
-                      className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                        form.model === m
-                          ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
-                          : "bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600"
-                      }`}
-                    >
-                      <ModelIcon model={m} className="h-3.5 w-3.5" />
-                      {m.charAt(0).toUpperCase() + m.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Color */}
-              <div>
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Color</label>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  {COLOR_PRESETS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, avatarColor: color }))}
-                      className={`h-7 w-7 rounded-full transition-transform ${
-                        form.avatarColor === color ? "scale-110 ring-2 ring-offset-2 ring-zinc-900 dark:ring-zinc-100 dark:ring-offset-zinc-800" : "hover:scale-105"
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                  <input
-                    type="text"
-                    value={form.avatarColor}
-                    onChange={(e) => setForm((f) => ({ ...f, avatarColor: e.target.value }))}
-                    className="w-20 rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-2 py-1 text-xs text-zinc-900 dark:text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    placeholder="#hex"
-                  />
-                </div>
-              </div>
-
-              {/* Icon */}
-              <div>
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Icon</label>
-                <div className="mt-1">
-                  <IconPicker
-                    value={form.icon}
-                    onChange={(icon) => setForm((f) => ({ ...f, icon }))}
-                  />
-                </div>
-              </div>
-
-              {/* Personality */}
-              <div>
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Personality</label>
-                <textarea
-                  value={form.personality ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, personality: e.target.value }))}
-                  placeholder="System prompt for this agent. Supports markdown. Example: You are a meticulous code reviewer who focuses on security, performance, and maintainability..."
-                  rows={6}
-                  className="mt-1 w-full rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 font-mono"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={cancelForm}
-                  className="rounded-lg px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !form.name.trim()}
-                  className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-sm font-medium text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50"
-                >
-                  {saving ? "Saving..." : editingAgent ? "Save Changes" : "Create Agent"}
-                </button>
-              </div>
-            </div>
-          ) : tab === "general" ? (
-            <div className="space-y-6">
-              {/* Theme toggle */}
-              <div className="flex items-center justify-between px-3 py-2.5">
-                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Theme</span>
-                {mounted && (
-                  <button
-                    onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-                    className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
-                    title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
-                  >
-                    {resolvedTheme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                  </button>
-                )}
-              </div>
-
-              {/* Display Name */}
-              <div className="flex items-center justify-between px-3 py-2.5">
-                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Display Name</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Your name"
-                    className="w-48 rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  />
-                  {displayName !== savedDisplayName && (
-                    <button
-                      onClick={handleSaveDisplayName}
-                      className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200"
-                    >
-                      Save
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Quick Replies */}
-              <div className="flex items-center justify-between px-3 py-2.5">
-                <div>
-                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Quick Replies <span className="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">beta</span></span>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500">Suggest follow-up replies after agents respond</p>
-                </div>
-                <button
-                  onClick={async () => {
-                    const next = !quickRepliesEnabled;
-                    setQuickRepliesEnabled(next);
-                    await fetch("/api/config", {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ quickRepliesEnabled: next }),
-                    });
-                  }}
-                  className={`relative h-6 w-11 rounded-full transition-colors ${
-                    quickRepliesEnabled ? "bg-violet-600" : "bg-zinc-300 dark:bg-zinc-600"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                      quickRepliesEnabled ? "translate-x-5" : ""
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Tool Call Grouping */}
-              <div className="flex items-center justify-between px-3 py-2.5">
-                <div>
-                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Group Tool Calls</span>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500">Collapse consecutive tool calls into an accordion</p>
-                </div>
-                <button
-                  onClick={async () => {
-                    const next = !toolCallGroupingEnabled;
-                    setToolCallGroupingEnabled(next);
-                    await fetch("/api/config", {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ toolCallGroupingEnabled: next }),
-                    });
-                  }}
-                  className={`relative h-6 w-11 rounded-full transition-colors ${
-                    toolCallGroupingEnabled ? "bg-violet-600" : "bg-zinc-300 dark:bg-zinc-600"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                      toolCallGroupingEnabled ? "translate-x-5" : ""
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Permission Level */}
-              <div className="px-3 py-2.5">
-                <div className="mb-2">
-                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Default Permission Level</span>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500">Controls what agents can do in new threads for this workspace</p>
-                </div>
-                <div className="space-y-1">
-                  {PERMISSION_LEVELS.map(({ value, label, description, icon: IconComp }) => (
-                    <button
-                      key={value}
-                      onClick={async () => {
-                        setWsPermissionLevel(value);
-                        if (workspaceId) {
-                          await fetch(`/api/workspaces/${workspaceId}`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ permissionLevel: value }),
-                          });
-                        }
-                      }}
-                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
-                        wsPermissionLevel === value
-                          ? "bg-zinc-100 dark:bg-zinc-700 ring-1 ring-zinc-300 dark:ring-zinc-600"
-                          : "hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
-                      }`}
-                    >
-                      <IconComp className={`h-4 w-4 shrink-0 ${
-                        value === "full" ? "text-emerald-600" : value === "auto-edit" ? "text-blue-600" : "text-amber-600"
-                      }`} />
-                      <div className="min-w-0">
-                        <div className={`text-sm ${wsPermissionLevel === value ? "font-semibold text-zinc-900 dark:text-zinc-100" : "font-medium text-zinc-700 dark:text-zinc-300"}`}>
-                          {label}
-                        </div>
-                        <div className="text-xs text-zinc-400 dark:text-zinc-500">{description}</div>
-                      </div>
-                      {wsPermissionLevel === value && (
-                        <span className="ml-auto text-violet-600 dark:text-violet-400">&#10003;</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-          ) : tab === "agents" ? (
-            <div className="space-y-1">
-              <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Agent Profiles</h4>
-                <button
-                  onClick={startCreate}
-                  className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200"
-                >
-                  + Add Agent
-                </button>
-              </div>
-
-              {error && (
-                <div className="rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800 mb-2">
-                  {error}
-                </div>
-              )}
-
-              {agents.map((agent) => (
-                <div
-                  key={agent.id}
-                  draggable
-                  onDragStart={() => setDragId(agent.id)}
-                  onDragEnd={() => { setDragId(null); setDragOverId(null); }}
-                  onDragOver={(e) => { e.preventDefault(); setDragOverId(agent.id); }}
-                  onDrop={() => {
-                    if (dragId && dragId !== agent.id) {
-                      const ids = agents.map((a) => a.id);
-                      const fromIdx = ids.indexOf(dragId);
-                      ids.splice(fromIdx, 1);
-                      const toIdx = ids.indexOf(agent.id);
-                      ids.splice(toIdx, 0, dragId);
-                      const reordered = ids.map((id) => agents.find((a) => a.id === id)!);
-                      setAgents(reordered);
-                      fetch("/api/agents/reorder", {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ orderedIds: ids }),
-                      });
-                    }
-                    setDragId(null);
-                    setDragOverId(null);
-                  }}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 ${
-                    dragId === agent.id ? "opacity-40" : ""
-                  } ${dragOverId === agent.id && dragId !== agent.id ? "ring-2 ring-violet-500 ring-inset" : ""}`}
-                >
-                  <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-zinc-300 dark:text-zinc-600" />
-                  <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white dark:bg-zinc-800"
-                    style={{
-                      border: `1.5px solid ${agent.avatarColor}`,
-                      boxShadow: `inset 0 2px 6px ${agent.avatarColor}80`,
-                    }}
-                  >
-                    <ModelIcon model={agent.model} icon={agent.icon} className="h-4 w-4" />
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{agent.name}</span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {agent.model}
-                      {agent.isDefault && " · default"}
-                      {agent.personality && " · has personality"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => startEdit(agent)}
-                      className="rounded p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
-                      title="Edit"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    {!agent.isDefault && (
-                      <button
-                        onClick={() => handleDelete(agent)}
-                        className="rounded p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : tab === "plugins" ? (
-            <div className="space-y-1">
-              <h4 className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">Plugins</h4>
-              {PLUGINS.map((plugin) => {
-                const enabled = plugins[plugin.id] ?? plugin.enabledByDefault;
-                return (
-                  <div
-                    key={plugin.id}
-                    className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-                  >
-                    <div>
-                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{plugin.name}</span>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        const updated = { ...plugins, [plugin.id]: !enabled };
-                        setPlugins(updated);
-                        await fetch("/api/config", {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ plugins: updated }),
-                        });
-                      }}
-                      className={`relative h-6 w-11 rounded-full transition-colors ${
-                        enabled ? "bg-violet-600" : "bg-zinc-300 dark:bg-zinc-600"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                          enabled ? "translate-x-5" : ""
-                        }`}
-                      />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : tab === "mcp" ? (
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">MCP Servers <span className="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">beta</span></h4>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                Connect to MCP servers that provide interactive app UIs for their tools.
-              </p>
-
-              {/* Add form */}
-              <div className="space-y-2 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
-                <input
-                  type="text"
-                  value={mcpForm.name}
-                  onChange={(e) => setMcpForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Name"
-                  className="w-full rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                />
-                <input
-                  type="text"
-                  value={mcpForm.url}
-                  onChange={(e) => setMcpForm((f) => ({ ...f, url: e.target.value }))}
-                  placeholder="Remote MCP server URL"
-                  className="w-full rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                />
-
-                {/* Advanced settings toggle */}
-                <button
-                  type="button"
-                  onClick={() => setMcpAdvanced(!mcpAdvanced)}
-                  className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-                >
-                  <ChevronRight className={`h-3 w-3 transition-transform ${mcpAdvanced ? "rotate-90" : ""}`} />
-                  Advanced settings
-                </button>
-
-                {mcpAdvanced && (
-                  <div className="space-y-2 pl-4 border-l-2 border-zinc-200 dark:border-zinc-700">
-                    <p className="text-[10px] text-zinc-400">For local stdio servers (instead of remote URL)</p>
-                    <input
-                      type="text"
-                      value={mcpForm.command}
-                      onChange={(e) => setMcpForm((f) => ({ ...f, command: e.target.value }))}
-                      placeholder="Command (e.g. npx)"
-                      className="w-full rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    />
-                    <input
-                      type="text"
-                      value={mcpForm.args}
-                      onChange={(e) => setMcpForm((f) => ({ ...f, args: e.target.value }))}
-                      placeholder="Arguments (e.g. -y @modelcontextprotocol/server-map --stdio)"
-                      className="w-full rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    />
-                  </div>
-                )}
-
-                <button
-                  onClick={async () => {
-                    const hasUrl = mcpForm.url.trim();
-                    const hasCommand = mcpForm.command.trim();
-                    if (!mcpForm.name.trim() || (!hasUrl && !hasCommand)) return;
-                    setMcpAdding(true);
-                    await fetch("/api/mcp-servers", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        name: mcpForm.name.trim(),
-                        transport: hasUrl ? "sse" : "stdio",
-                        ...(hasUrl
-                          ? { url: mcpForm.url.trim() }
-                          : {
-                              command: mcpForm.command.trim(),
-                              args: mcpForm.args.trim().split(/\s+/).filter(Boolean),
-                            }),
-                      }),
-                    });
-                    setMcpForm({ name: "", url: "", command: "", args: "" });
-                    setMcpAdding(false);
-                    setMcpAdvanced(false);
-                    fetchMcpServers();
-                  }}
-                  disabled={mcpAdding || !mcpForm.name.trim() || (!mcpForm.url.trim() && !mcpForm.command.trim())}
-                  className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50"
-                >
-                  {mcpAdding ? "Connecting..." : "Add"}
-                </button>
-              </div>
-
-              {/* Server list */}
-              {mcpServers.map((server) => (
-                <div key={server.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700">
-                  <div className="flex items-center gap-2">
-                    <div className={`h-2 w-2 rounded-full ${server.connected ? "bg-emerald-500" : "bg-red-400"}`} />
-                    <div>
-                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{server.name}</span>
-                      <p className="text-xs text-zinc-400">
-                        {(server as McpServer & { url?: string }).url || `${server.command} ${server.args?.join(" ")}`}
-                        {server.connected && ` · ${server.appToolCount} app tool${server.appToolCount !== 1 ? "s" : ""}`}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      await fetch(`/api/mcp-servers/${server.id}`, { method: "DELETE" });
-                      fetchMcpServers();
-                    }}
-                    className="rounded p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30"
-                    title="Remove"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-
-              {mcpServers.length === 0 && (
-                <p className="text-center text-xs text-zinc-400 py-4">No MCP servers configured</p>
-              )}
-            </div>
-          ) : null}
+          {renderContent()}
         </div>
       </div>
     </Dialog>
