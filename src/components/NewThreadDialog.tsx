@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Agent, ThreadWithMessages } from "@/lib/types";
 import Dialog from "./Dialog";
 import ModelIcon from "./ModelIcon";
@@ -21,6 +21,12 @@ export default function NewThreadDialog({
   const [title, setTitle] = useState("");
   const [selectedAgentId, setSelectedAgentId] = useState<string>(agents[0]?.id ?? "");
   const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (agents.length > 0 && !agents.some((a) => a.id === selectedAgentId)) {
+      setSelectedAgentId(agents[0].id);
+    }
+  }, [agents, selectedAgentId]);
 
   const handleCreate = async () => {
     if (!title.trim() || !selectedAgentId) return;
