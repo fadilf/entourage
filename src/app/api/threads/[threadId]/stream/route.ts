@@ -60,10 +60,14 @@ export async function POST(
           clientDisconnected = true;
         });
 
-        // Send in-memory accumulated content (avoids gap from periodic persist)
-        if (existing.accumulatedContent) {
+        // Send in-memory accumulated state (avoids gap from periodic persist)
+        if (existing.accumulatedContent || existing.accumulatedBlocks.length > 0) {
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "initial", content: existing.accumulatedContent })}\n\n`)
+            encoder.encode(`data: ${JSON.stringify({
+              type: "initial",
+              content: existing.accumulatedContent,
+              ...(existing.accumulatedBlocks.length > 0 ? { blocks: existing.accumulatedBlocks } : {}),
+            })}\n\n`)
           );
         }
 
@@ -185,7 +189,10 @@ export async function POST(
                 accumulatedContent += event.text;
                 // Keep process entry in sync for re-attachment
                 const proc = pm.getProcess(threadId, agent.id);
-                if (proc) proc.accumulatedContent = accumulatedContent;
+                if (proc) {
+                  proc.accumulatedContent = accumulatedContent;
+                  proc.accumulatedBlocks = accumulatedBlocks;
+                }
                 // Append to last text block or create new one
                 const lastBlock = accumulatedBlocks[accumulatedBlocks.length - 1];
                 if (lastBlock && lastBlock.type === "text") {
@@ -207,6 +214,9 @@ export async function POST(
                 };
                 accumulatedToolCalls.push(tc);
                 accumulatedBlocks.push({ type: "tool_call", toolCall: tc });
+                // Keep process entry blocks in sync for re-attachment
+                const proc = pm.getProcess(threadId, agent.id);
+                if (proc) proc.accumulatedBlocks = accumulatedBlocks;
                 try {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
                 } catch { /* Client disconnected */ }

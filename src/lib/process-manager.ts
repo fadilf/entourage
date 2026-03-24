@@ -12,6 +12,7 @@ type ProcessEntry = {
   buffer: string[]; // Recent stdout chunks for re-attachment
   stderrBuffer: string[]; // Stderr output (not shown as content)
   accumulatedContent: string; // Full parsed content for re-attachment
+  accumulatedBlocks: import("./types").ContentBlock[]; // Full content blocks for re-attachment
 };
 
 const MAX_BUFFER_CHUNKS = 100;
@@ -141,6 +142,7 @@ class ProcessManager {
       buffer: [],
       stderrBuffer: [],
       accumulatedContent: "",
+      accumulatedBlocks: [],
     };
     this.processes.set(k, entry);
 
@@ -237,6 +239,7 @@ class ProcessManager {
             buffer: [],
             stderrBuffer: [],
             accumulatedContent: "",
+            accumulatedBlocks: [],
           };
           this.processes.set(k, retryEntry);
 

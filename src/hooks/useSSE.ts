@@ -64,13 +64,21 @@ export function useAgentStream(
 
       switch (event.type) {
         case "initial": {
-          // Reattach-only: set (not append) persisted content.
-          // Initialize contentBlocks so future content deltas append correctly
-          // (otherwise blocks start empty and only contain post-reattach deltas).
+          // Reattach-only: restore full accumulated state (content + blocks).
+          // If the server sent blocks (with tool calls, mcp apps, etc.), use those;
+          // otherwise fall back to a single text block from the content string.
+          const initialBlocks: ContentBlock[] = Array.isArray(event.blocks) && event.blocks.length > 0
+            ? event.blocks
+            : event.content ? [{ type: "text" as const, text: event.content }] : [];
+          // Extract tool calls from blocks for the toolCalls field
+          const initialToolCalls: ToolCall[] = initialBlocks
+            .filter((b): b is ContentBlock & { type: "tool_call" } => b.type === "tool_call")
+            .map((b) => b.toolCall);
           threadStreams.set(agentId, {
             agentId,
             content: event.content,
-            contentBlocks: event.content ? [{ type: "text" as const, text: event.content }] : [],
+            contentBlocks: initialBlocks,
+            ...(initialToolCalls.length > 0 ? { toolCalls: initialToolCalls } : {}),
             isReattach: false,
           });
           triggerRender();
