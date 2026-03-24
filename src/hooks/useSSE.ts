@@ -60,8 +60,15 @@ export function useAgentStream(
 
       switch (event.type) {
         case "initial": {
-          // Reattach-only: set (not append) persisted content
-          threadStreams.set(agentId, { agentId, content: event.content, isReattach: false });
+          // Reattach-only: set (not append) persisted content.
+          // Initialize contentBlocks so future content deltas append correctly
+          // (otherwise blocks start empty and only contain post-reattach deltas).
+          threadStreams.set(agentId, {
+            agentId,
+            content: event.content,
+            contentBlocks: event.content ? [{ type: "text" as const, text: event.content }] : [],
+            isReattach: false,
+          });
           triggerRender();
           break;
         }
