@@ -56,7 +56,7 @@ export default function ToolCallGroup({ toolCalls }: { toolCalls: ToolCall[] }) 
       </button>
 
       {expanded && (
-        <div className="border-t border-zinc-200 dark:border-zinc-700 divide-y divide-zinc-200 dark:divide-zinc-700">
+        <div className="mx-2 mb-1.5 mt-0.5 rounded border border-zinc-200 dark:border-zinc-700 divide-y divide-zinc-200 dark:divide-zinc-700 overflow-hidden">
           {toolCalls.map((tc) => (
             <ToolCallBlock key={tc.id} toolCall={tc} grouped />
           ))}

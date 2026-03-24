@@ -50,7 +50,7 @@ export default function ToolCallBlock({ toolCall, grouped }: { toolCall: ToolCal
   const inputSummary = toolCall.input ? formatInput(toolCall.input) : "";
 
   return (
-    <div className={grouped ? "text-xs" : "my-1.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 text-xs"}>
+    <div className={grouped ? "text-xs bg-zinc-100/60 dark:bg-zinc-800/60" : "my-1.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 text-xs"}>
       <button
         onClick={() => setExpanded(!expanded)}
         className={`flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors ${grouped ? "" : "rounded-md"}`}
