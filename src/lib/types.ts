@@ -37,6 +37,8 @@ export type Thread = {
   archived?: boolean;
   unreadAgents?: string[];
   permissionLevel?: PermissionLevel;
+  coordinatorId?: string;
+  maxAutoDispatches?: number;
 };
 
 export type MessageImage = {

@@ -265,6 +265,29 @@ export async function updateThreadPermissionLevel(workspaceDir: string, threadId
   });
 }
 
+export async function updateThreadCoordinator(
+  workspaceDir: string,
+  threadId: string,
+  coordinatorId: string | null,
+  maxAutoDispatches?: number
+): Promise<ThreadWithMessages | null> {
+  return withLock(threadId, async () => {
+    const thread = await getThread(workspaceDir, threadId);
+    if (!thread) return null;
+    if (coordinatorId === null) {
+      delete thread.coordinatorId;
+    } else {
+      thread.coordinatorId = coordinatorId;
+    }
+    if (maxAutoDispatches !== undefined) {
+      thread.maxAutoDispatches = maxAutoDispatches;
+    }
+    thread.updatedAt = new Date().toISOString();
+    await writeFile(getThreadPath(workspaceDir, threadId), JSON.stringify(thread, null, 2));
+    return thread;
+  });
+}
+
 export async function addAgentsToThread(workspaceDir: string, threadId: string, newAgents: Agent[]): Promise<ThreadWithMessages | null> {
   return withLock(threadId, async () => {
     const thread = await getThread(workspaceDir, threadId);

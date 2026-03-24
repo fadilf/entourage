@@ -62,7 +62,7 @@ export default function ThreadPage() {
     [threadId, refetchThread, refetchThreads]
   );
 
-  const { streamingMessages, isStreaming, sendMessage, stopAgent, reattach } =
+  const { streamingMessages, isStreaming, sendMessage, stopAgent, reattach, autoDispatchPaused, resetAutoDispatch } =
     useAgentStream(threadId, handleStreamComplete, workspaceId, handleInlineSuggestions);
 
   // Re-attach to streams on mount
@@ -132,6 +132,38 @@ export default function ThreadPage() {
       const updated = await res.json();
       setSelectedThread((prev) =>
         prev ? { ...prev, permissionLevel: updated.permissionLevel } : prev
+      );
+    },
+    [threadId, setSelectedThread, wsUrl]
+  );
+
+  const handleChangeCoordinator = useCallback(
+    async (agentId: string | null) => {
+      const res = await fetch(wsUrl(`/api/threads/${threadId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coordinatorId: agentId }),
+      });
+      if (!res.ok) return;
+      const updated = await res.json();
+      setSelectedThread((prev) =>
+        prev ? { ...prev, coordinatorId: updated.coordinatorId } : prev
+      );
+    },
+    [threadId, setSelectedThread, wsUrl]
+  );
+
+  const handleChangeMaxAutoDispatches = useCallback(
+    async (limit: number) => {
+      const res = await fetch(wsUrl(`/api/threads/${threadId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxAutoDispatches: limit }),
+      });
+      if (!res.ok) return;
+      const updated = await res.json();
+      setSelectedThread((prev) =>
+        prev ? { ...prev, maxAutoDispatches: updated.maxAutoDispatches } : prev
       );
     },
     [threadId, setSelectedThread, wsUrl]
@@ -264,6 +296,12 @@ export default function ThreadPage() {
       permissionLevel={effectivePermissionLevel}
       onChangePermissionLevel={handleChangePermissionLevel}
       workspaceThreads={threads.length > 0 ? threads : undefined}
+      coordinatorId={selectedThread?.coordinatorId ?? null}
+      onChangeCoordinator={handleChangeCoordinator}
+      maxAutoDispatches={selectedThread?.maxAutoDispatches}
+      onChangeMaxAutoDispatches={handleChangeMaxAutoDispatches}
+      autoDispatchPaused={autoDispatchPaused}
+      onResumeAutoDispatch={resetAutoDispatch}
     />
   );
 }

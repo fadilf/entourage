@@ -6,7 +6,7 @@ import { MessageImage, ToolCall, ContentBlock, PermissionDenial, isAgentModel } 
 import { loadAgents, loadQuickReplies } from "@/lib/agent-store";
 import { buildContextualPrompt, buildFullHistoryPrompt } from "@/lib/context";
 import { QUICK_REPLY_INSTRUCTION, parseQuickReplies } from "@/lib/quick-replies";
-import { stripMentions } from "@/lib/mentions";
+import { stripMentions, parseMentions } from "@/lib/mentions";
 import path from "path";
 import { getUploadsDir, ENTOURAGE_DIR, THREADS_DIR } from "@/lib/config";
 import { resolveWorkspace } from "@/lib/workspace-context";
@@ -337,6 +337,23 @@ export async function POST(
               if (inlineSuggestions.length > 0) {
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "suggestions", suggestions: inlineSuggestions })}\n\n`));
               }
+
+              // Auto-dispatch: if thread has a coordinator and this agent's response @mentions other agents
+              if (status === "complete" && thread.coordinatorId && finalContent) {
+                const mentionedAgents = parseMentions(finalContent, allAgents);
+                // Filter out self-mentions — only dispatch to other agents or allow self-loop
+                const dispatchAgents = mentionedAgents.map((a) => ({ id: a.id, name: a.name }));
+                if (dispatchAgents.length > 0) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                    type: "auto_dispatch",
+                    agents: dispatchAgents,
+                    sourceAgentId: agent.id,
+                    sourceAgentName: agent.name,
+                    limit: thread.maxAutoDispatches ?? 50,
+                  })}\n\n`));
+                }
+              }
+
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done", status })}\n\n`));
               controller.close();
             } catch {

@@ -1,4 +1,4 @@
-import { getThread, deleteThread, updateThreadTitle, archiveThread, clearUnreadAgents, updateThreadPermissionLevel } from "@/lib/thread-store";
+import { getThread, deleteThread, updateThreadTitle, archiveThread, clearUnreadAgents, updateThreadPermissionLevel, updateThreadCoordinator } from "@/lib/thread-store";
 import { getProcessManager } from "@/lib/process-manager";
 import { badRequest, notFound, routeWithWorkspace, routeWithWorkspaceJson } from "@/lib/api-route";
 import { PermissionLevel } from "@/lib/types";
@@ -10,6 +10,8 @@ type UpdateThreadBody = {
   archived?: boolean;
   title?: string;
   permissionLevel?: PermissionLevel;
+  coordinatorId?: string | null;
+  maxAutoDispatches?: number;
 };
 
 export const GET = routeWithWorkspace<{ threadId: string }>(async ({ params, workspaceDir }) => {
@@ -40,6 +42,19 @@ export const PATCH = routeWithWorkspaceJson<{ threadId: string }, UpdateThreadBo
         throw badRequest("Invalid permission level");
       }
       const thread = await updateThreadPermissionLevel(workspaceDir, params.threadId, body.permissionLevel);
+      if (!thread) {
+        throw notFound("Thread not found");
+      }
+      return thread;
+    }
+
+    if (body.coordinatorId !== undefined || body.maxAutoDispatches !== undefined) {
+      const thread = await updateThreadCoordinator(
+        workspaceDir,
+        params.threadId,
+        body.coordinatorId ?? null,
+        body.maxAutoDispatches
+      );
       if (!thread) {
         throw notFound("Thread not found");
       }

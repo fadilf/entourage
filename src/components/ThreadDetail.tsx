@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ThreadWithMessages, Agent, Message, MessageImage, PermissionLevel, ThreadListItem } from "@/lib/types";
-import { ChevronLeft, Copy, Pencil, RotateCcw, Send, ShieldCheck, ShieldAlert, Shield } from "lucide-react";
+import { ChevronLeft, Copy, Pencil, RotateCcw, Send, ShieldCheck, ShieldAlert, Shield, RefreshCw, Repeat } from "lucide-react";
 import Dialog from "./Dialog";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
@@ -28,6 +28,12 @@ export default function ThreadDetail({
   permissionLevel,
   onChangePermissionLevel,
   workspaceThreads,
+  coordinatorId,
+  onChangeCoordinator,
+  maxAutoDispatches,
+  onChangeMaxAutoDispatches,
+  autoDispatchPaused,
+  onResumeAutoDispatch,
 }: {
   thread: ThreadWithMessages | null;
   streamingMessages: Map<string, { agentId: string; content: string; toolCalls?: import("@/lib/types").ToolCall[]; contentBlocks?: import("@/lib/types").ContentBlock[]; isReattach?: boolean }>;
@@ -47,6 +53,12 @@ export default function ThreadDetail({
   permissionLevel?: PermissionLevel;
   onChangePermissionLevel?: (level: PermissionLevel) => void;
   workspaceThreads?: ThreadListItem[];
+  coordinatorId?: string | null;
+  onChangeCoordinator?: (agentId: string | null) => void;
+  maxAutoDispatches?: number;
+  onChangeMaxAutoDispatches?: (limit: number) => void;
+  autoDispatchPaused?: boolean;
+  onResumeAutoDispatch?: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
@@ -55,6 +67,7 @@ export default function ThreadDetail({
   const [rewindConfirm, setRewindConfirm] = useState<string | null>(null);
   const [revertCode, setRevertCode] = useState(false);
   const [showPermDropdown, setShowPermDropdown] = useState(false);
+  const [showCoordDropdown, setShowCoordDropdown] = useState(false);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -238,8 +251,98 @@ export default function ThreadDetail({
               )}
             </div>
           )}
+          {/* Coordinator setting */}
+          {onChangeCoordinator && thread.agents.length > 0 && (
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setShowCoordDropdown((v) => !v)}
+                className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                  coordinatorId
+                    ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400"
+                    : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                }`}
+                title="Set a coordinator agent for auto-dispatch loops"
+              >
+                <Repeat className="h-3 w-3" />
+                {coordinatorId
+                  ? thread.agents.find((a) => a.id === coordinatorId)?.name ?? "Coordinator"
+                  : "No Coordinator"}
+              </button>
+              {showCoordDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowCoordDropdown(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 py-1 shadow-lg">
+                    <button
+                      onClick={() => {
+                        onChangeCoordinator(null);
+                        setShowCoordDropdown(false);
+                      }}
+                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-xs transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700 ${
+                        !coordinatorId ? "font-semibold text-zinc-900 dark:text-zinc-100" : "text-zinc-600 dark:text-zinc-400"
+                      }`}
+                    >
+                      <div className="text-left">
+                        <div>None</div>
+                        <div className="text-[10px] font-normal text-zinc-400">Multi-mentions dispatch in parallel</div>
+                      </div>
+                      {!coordinatorId && <span className="ml-auto text-violet-600">&#10003;</span>}
+                    </button>
+                    <div className="my-1 border-t border-zinc-100 dark:border-zinc-700" />
+                    {thread.agents.map((a) => (
+                      <button
+                        key={a.id}
+                        onClick={() => {
+                          onChangeCoordinator(a.id);
+                          setShowCoordDropdown(false);
+                        }}
+                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-xs transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700 ${
+                          coordinatorId === a.id ? "font-semibold text-zinc-900 dark:text-zinc-100" : "text-zinc-600 dark:text-zinc-400"
+                        }`}
+                      >
+                        <div
+                          className="h-3 w-3 rounded-full border"
+                          style={{ borderColor: a.avatarColor, backgroundColor: coordinatorId === a.id ? a.avatarColor : "transparent" }}
+                        />
+                        <span>{a.name}</span>
+                        {coordinatorId === a.id && <span className="ml-auto text-violet-600">&#10003;</span>}
+                      </button>
+                    ))}
+                    {coordinatorId && onChangeMaxAutoDispatches && (
+                      <>
+                        <div className="my-1 border-t border-zinc-100 dark:border-zinc-700" />
+                        <div className="flex items-center gap-2 px-3 py-1.5">
+                          <span className="text-[10px] text-zinc-400">Loop limit</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={1000}
+                            value={maxAutoDispatches ?? 50}
+                            onChange={(e) => onChangeMaxAutoDispatches(parseInt(e.target.value) || 50)}
+                            className="w-16 rounded border border-zinc-200 dark:border-zinc-600 bg-transparent px-1.5 py-0.5 text-[11px] text-zinc-700 dark:text-zinc-300"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
+      {/* Auto-dispatch paused banner */}
+      {autoDispatchPaused && onResumeAutoDispatch && (
+        <div className="flex items-center gap-2 border-b border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-6 py-2">
+          <span className="text-xs text-amber-700 dark:text-amber-400">Auto-dispatch loop paused — iteration limit reached.</span>
+          <button
+            onClick={onResumeAutoDispatch}
+            className="flex items-center gap-1 rounded-md bg-amber-200 dark:bg-amber-800 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-200 hover:bg-amber-300 dark:hover:bg-amber-700"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Resume
+          </button>
+        </div>
+      )}
       <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto pt-3 pb-2">
         <MessageList
           messages={allMessages}

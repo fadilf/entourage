@@ -23,12 +23,16 @@ export function useAgentStream(
     new Map()
   );
   const abortControllers = useRef<Map<string, AbortController>>(new Map());
+  const autoDispatchCounters = useRef<Map<string, number>>(new Map());
+  const [autoDispatchPaused, setAutoDispatchPaused] = useState(false);
   const [, setRenderTick] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const onCompleteRef = useRef(onStreamComplete);
   onCompleteRef.current = onStreamComplete;
   const onSuggestionsRef = useRef(onInlineSuggestions);
   onSuggestionsRef.current = onInlineSuggestions;
+  // Ref to streamAgent so auto_dispatch can call it without circular deps
+  const streamAgentRef = useRef<((tid: string, agentId: string, prompt: string) => Promise<void>) | undefined>(undefined);
   const threadIdRef = useRef(threadId);
   threadIdRef.current = threadId;
   const workspaceIdRef = useRef(workspaceId);
@@ -149,6 +153,20 @@ export function useAgentStream(
         case "suggestions": {
           if (tid === threadIdRef.current) {
             onSuggestionsRef.current?.(event.suggestions);
+          }
+          break;
+        }
+        case "auto_dispatch": {
+          const counter = (autoDispatchCounters.current.get(tid) ?? 0) + 1;
+          autoDispatchCounters.current.set(tid, counter);
+          const limit = event.limit ?? 50;
+          if (counter > limit) {
+            setAutoDispatchPaused(true);
+          } else {
+            const prompt = `(auto-dispatched by @${event.sourceAgentName})`;
+            for (const a of event.agents) {
+              streamAgentRef.current?.(tid, a.id, prompt);
+            }
           }
           break;
         }
@@ -284,6 +302,8 @@ export function useAgentStream(
     [triggerRender, wsParam, consumeStream, cleanupStream]
   );
 
+  streamAgentRef.current = streamAgent;
+
   const sendMessage = useCallback(
     async (content: string, targetAgents: Agent[], images?: MessageImage[], attachedThreadIds?: string[]) => {
       if (!threadId) return;
@@ -359,6 +379,13 @@ export function useAgentStream(
     [triggerRender, wsParam, consumeStream, cleanupStream]
   );
 
+  const resetAutoDispatch = useCallback(() => {
+    if (threadId) {
+      autoDispatchCounters.current.set(threadId, 0);
+    }
+    setAutoDispatchPaused(false);
+  }, [threadId]);
+
   return {
     streamingMessages,
     isStreaming,
@@ -366,5 +393,7 @@ export function useAgentStream(
     sendMessage,
     stopAgent,
     reattach,
+    autoDispatchPaused,
+    resetAutoDispatch,
   };
 }
