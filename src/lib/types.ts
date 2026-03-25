@@ -2,6 +2,8 @@ export const AGENT_MODELS = ["claude", "gemini", "codex"] as const;
 
 export type AgentModel = (typeof AGENT_MODELS)[number];
 
+export type CliModelDefaults = Partial<Record<AgentModel, string>>;
+
 export function isAgentModel(value: unknown): value is AgentModel {
   return typeof value === "string" && AGENT_MODELS.includes(value as AgentModel);
 }
@@ -22,6 +24,7 @@ export type Agent = {
   id: string;
   name: string;
   model: AgentModel;
+  cliModel?: string;
   avatarColor: string;
   icon?: Icon;
   personality?: string;

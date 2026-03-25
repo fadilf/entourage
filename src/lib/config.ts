@@ -1,9 +1,12 @@
 import path from "path";
-import { Agent, AgentModel, PermissionLevel } from "./types";
+import { Agent, AgentModel, CliModelDefaults, PermissionLevel } from "./types";
 
 export const ENTOURAGE_DIR = ".entourage";
 export const THREADS_DIR = "threads";
 export const UPLOADS_DIR = "uploads";
+export const DEFAULT_CLI_MODELS: CliModelDefaults = {
+  codex: "gpt-5.4",
+};
 
 export function getUploadsDir(workspaceDir?: string): string {
   return path.join(workspaceDir || process.cwd(), ENTOURAGE_DIR, UPLOADS_DIR);
@@ -30,13 +33,23 @@ export const DEFAULT_AGENTS: Agent[] = [
     id: "codex",
     name: "Codex",
     model: "codex",
+    cliModel: DEFAULT_CLI_MODELS.codex,
     avatarColor: "#10a37f",
     isDefault: true,
   },
 ];
 
-export function getCliCommand(model: AgentModel, prompt: string, sessionId: string, isResume: boolean, personality?: string, imagePaths?: string[], permissionLevel: PermissionLevel = "full", threadPaths?: string[]): { cmd: string; args: string[] } {
+export function resolveCliModel(
+  model: AgentModel,
+  cliModel?: string,
+  defaultCliModels: CliModelDefaults = DEFAULT_CLI_MODELS
+): string | undefined {
+  return cliModel?.trim() || defaultCliModels[model];
+}
+
+export function getCliCommand(model: AgentModel, prompt: string, sessionId: string, isResume: boolean, personality?: string, cliModel?: string, imagePaths?: string[], permissionLevel: PermissionLevel = "full", threadPaths?: string[]): { cmd: string; args: string[] } {
   const hasImages = imagePaths && imagePaths.length > 0;
+  const effectiveCliModel = resolveCliModel(model, cliModel);
 
   // Build prompt with image instructions
   let fullPrompt = prompt;
@@ -81,6 +94,9 @@ export function getCliCommand(model: AgentModel, prompt: string, sessionId: stri
     if (personality) {
       args.push("--append-system-prompt", personality);
     }
+    if (effectiveCliModel) {
+      args.push("--model", effectiveCliModel);
+    }
     return { cmd: "claude", args };
   }
 
@@ -116,6 +132,9 @@ export function getCliCommand(model: AgentModel, prompt: string, sessionId: stri
         args.push(`--image=${p}`);
       }
     }
+    if (effectiveCliModel) {
+      args.push("--model", effectiveCliModel);
+    }
     args.push(effectivePrompt);
 
     return { cmd: "codex", args };
@@ -128,6 +147,9 @@ export function getCliCommand(model: AgentModel, prompt: string, sessionId: stri
   }
 
   const geminiArgs = ["-p", effectivePrompt, "--output-format", "stream-json"];
+  if (effectiveCliModel) {
+    geminiArgs.push("--model", effectiveCliModel);
+  }
   if (permissionLevel === "full") {
     geminiArgs.push("--yolo");
   } else if (permissionLevel === "auto-edit") {

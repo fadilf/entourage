@@ -7,6 +7,7 @@ export type Tab = "general" | "agents" | "plugins" | "mcp";
 export type AgentFormData = {
   name: string;
   model: AgentModel;
+  cliModel: string;
   avatarColor: string;
   icon?: Icon;
   personality?: string;
@@ -81,5 +82,6 @@ export const COLOR_PRESETS = [
 export const EMPTY_AGENT_FORM: AgentFormData = {
   name: "",
   model: "claude",
+  cliModel: "",
   avatarColor: "#8b5cf6",
 };

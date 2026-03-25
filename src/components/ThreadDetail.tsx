@@ -22,6 +22,7 @@ export default function ThreadDetail({
   onBack,
   onRewind,
   onResendMessage,
+  onEditMessage,
   suggestions,
   onSuggestionSelect,
   onDraftChange,
@@ -45,8 +46,9 @@ export default function ThreadDetail({
   displayName?: string;
   isMobile?: boolean;
   onBack?: () => void;
-  onRewind?: (messageId: string, options?: { keepMessage?: boolean; revertCode?: boolean }) => void;
+  onRewind?: (messageId: string, options?: { keepMessage?: boolean; revertCode?: boolean }) => Promise<void> | void;
   onResendMessage?: (message: Message) => void;
+  onEditMessage?: (message: Message) => Promise<boolean>;
   suggestions?: string[];
   onSuggestionSelect?: (text: string) => void;
   onDraftChange?: (hasText: boolean) => void;
@@ -68,6 +70,7 @@ export default function ThreadDetail({
   const [revertCode, setRevertCode] = useState(false);
   const [showPermDropdown, setShowPermDropdown] = useState(false);
   const [showCoordDropdown, setShowCoordDropdown] = useState(false);
+  const [editDraft, setEditDraft] = useState<string | null>(null);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -373,6 +376,8 @@ export default function ThreadDetail({
           showTopBorder={false}
           compactTopPadding={hasQuickReplies}
           workspaceThreads={workspaceThreads}
+          editDraft={editDraft}
+          onEditDraftConsumed={() => setEditDraft(null)}
         />
       </div>
       {contextMenu && (
@@ -399,13 +404,26 @@ export default function ThreadDetail({
               },
             },
             ...(contextMenu.message.role === "user"
-              ? [{
-                  label: "Re-send message",
-                  icon: <Send className="h-4 w-4" />,
-                  onClick: () => onResendMessage?.(contextMenu.message),
-                  disabled: isStreaming,
-                  disabledReason: "Can't re-send while an agent is running",
-                }]
+              ? [
+                  {
+                    label: "Edit message",
+                    icon: <Pencil className="h-4 w-4" />,
+                    onClick: async () => {
+                      const msg = contextMenu.message;
+                      const success = await onEditMessage?.(msg);
+                      if (success) setEditDraft(msg.content);
+                    },
+                    disabled: isStreaming,
+                    disabledReason: "Can't edit while an agent is running",
+                  },
+                  {
+                    label: "Re-send message",
+                    icon: <Send className="h-4 w-4" />,
+                    onClick: () => onResendMessage?.(contextMenu.message),
+                    disabled: isStreaming,
+                    disabledReason: "Can't re-send while an agent is running",
+                  },
+                ]
               : []),
             {
               label: "Rewind messages to here",

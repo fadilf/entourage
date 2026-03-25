@@ -144,6 +144,8 @@ export default function MessageInput({
   showTopBorder = true,
   compactTopPadding = false,
   workspaceThreads,
+  editDraft,
+  onEditDraftConsumed,
 }: {
   threadId: string;
   agents: Agent[];
@@ -156,6 +158,8 @@ export default function MessageInput({
   showTopBorder?: boolean;
   compactTopPadding?: boolean;
   workspaceThreads?: ThreadListItem[];
+  editDraft?: string | null;
+  onEditDraftConsumed?: () => void;
 }) {
   const workspaceId = useWorkspaceId();
   const wsParam = useWsParam();
@@ -211,6 +215,21 @@ export default function MessageInput({
   useEffect(() => {
     onDraftChange?.(content.trim().length > 0);
   }, [content, onDraftChange]);
+
+  // When an edit draft is provided, load it into the input and focus
+  useEffect(() => {
+    if (editDraft == null) return;
+    updateDraft(editDraft);
+    onEditDraftConsumed?.();
+    // Focus and move cursor to end
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (ta) {
+        ta.focus();
+        ta.selectionStart = ta.selectionEnd = ta.value.length;
+      }
+    });
+  }, [editDraft, onEditDraftConsumed, updateDraft]);
 
   useEffect(() => {
     const textarea = textareaRef.current;

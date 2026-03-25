@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Agent, PermissionLevel } from "@/lib/types";
+import { Agent, AgentModel, PermissionLevel } from "@/lib/types";
 import Dialog from "./Dialog";
 import { useTheme } from "next-themes";
 import { useWorkspaceId } from "@/contexts/WorkspaceContext";
@@ -18,6 +18,22 @@ import {
   type McpServer,
   type Tab,
 } from "./settings-dialog/types";
+
+const EMPTY_DEFAULT_CLI_MODELS: Record<AgentModel, string> = {
+  claude: "",
+  gemini: "",
+  codex: "",
+};
+
+function normalizeDefaultCliModels(
+  value?: Partial<Record<AgentModel, string>>
+): Record<AgentModel, string> {
+  return {
+    claude: value?.claude ?? "",
+    gemini: value?.gemini ?? "",
+    codex: value?.codex ?? "",
+  };
+}
 
 export default function SettingsDialog({
   open,
@@ -38,6 +54,8 @@ export default function SettingsDialog({
   useEffect(() => setMounted(true), []);
   const [displayName, setDisplayName] = useState("");
   const [savedDisplayName, setSavedDisplayName] = useState("");
+  const [defaultCliModels, setDefaultCliModels] = useState<Record<AgentModel, string>>(EMPTY_DEFAULT_CLI_MODELS);
+  const [savedDefaultCliModels, setSavedDefaultCliModels] = useState<Record<AgentModel, string>>(EMPTY_DEFAULT_CLI_MODELS);
   const [plugins, setPlugins] = useState<Record<string, boolean>>({});
   const [quickRepliesEnabled, setQuickRepliesEnabled] = useState(false);
   const [toolCallGroupingEnabled, setToolCallGroupingEnabled] = useState(false);
@@ -69,6 +87,9 @@ export default function SettingsDialog({
       const data = await res.json();
       setDisplayName(data.displayName || "");
       setSavedDisplayName(data.displayName || "");
+      const nextDefaultCliModels = normalizeDefaultCliModels(data.defaultCliModels);
+      setDefaultCliModels(nextDefaultCliModels);
+      setSavedDefaultCliModels(nextDefaultCliModels);
       setPlugins(data.plugins || {});
       if (data.quickReplies) {
         setQuickRepliesEnabled(data.quickReplies.enabled);
@@ -107,6 +128,16 @@ export default function SettingsDialog({
     }
   };
 
+  const handleSaveDefaultCliModels = async () => {
+    const res = await patchConfig({ defaultCliModels });
+    if (res.ok) {
+      const data = await res.json();
+      const nextDefaultCliModels = normalizeDefaultCliModels(data.defaultCliModels);
+      setSavedDefaultCliModels(nextDefaultCliModels);
+      setDefaultCliModels(nextDefaultCliModels);
+    }
+  };
+
   const showForm = editingAgent !== null || isCreating;
 
   const startCreate = () => {
@@ -120,6 +151,7 @@ export default function SettingsDialog({
     setForm({
       name: agent.name,
       model: agent.model,
+      cliModel: agent.cliModel ?? "",
       avatarColor: agent.avatarColor,
       icon: agent.icon,
       personality: agent.personality,
@@ -151,6 +183,7 @@ export default function SettingsDialog({
       const body = {
         name: form.name.trim(),
         model: form.model,
+        cliModel: form.cliModel.trim() || undefined,
         avatarColor: form.avatarColor,
         icon: form.icon,
         personality: form.personality?.trim() || undefined,
@@ -207,6 +240,10 @@ export default function SettingsDialog({
     const next = !quickRepliesEnabled;
     setQuickRepliesEnabled(next);
     await patchConfig({ quickRepliesEnabled: next });
+  };
+
+  const handleDefaultCliModelChange = (model: AgentModel, value: string) => {
+    setDefaultCliModels((current) => ({ ...current, [model]: value }));
   };
 
   const handleToggleToolCallGrouping = async () => {
@@ -278,12 +315,16 @@ export default function SettingsDialog({
             resolvedTheme={resolvedTheme}
             displayName={displayName}
             savedDisplayName={savedDisplayName}
+            defaultCliModels={defaultCliModels}
+            savedDefaultCliModels={savedDefaultCliModels}
             quickRepliesEnabled={quickRepliesEnabled}
             toolCallGroupingEnabled={toolCallGroupingEnabled}
             wsPermissionLevel={wsPermissionLevel}
             onToggleTheme={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             onDisplayNameChange={setDisplayName}
             onSaveDisplayName={handleSaveDisplayName}
+            onDefaultCliModelChange={handleDefaultCliModelChange}
+            onSaveDefaultCliModels={handleSaveDefaultCliModels}
             onToggleQuickReplies={handleToggleQuickReplies}
             onToggleToolCallGrouping={handleToggleToolCallGrouping}
             onPermissionLevelChange={handlePermissionLevelChange}

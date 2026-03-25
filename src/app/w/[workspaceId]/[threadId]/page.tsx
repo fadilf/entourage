@@ -273,6 +273,17 @@ export default function ThreadPage() {
     [rewindThread, sendUserMessage]
   );
 
+  // Edit – rewind to before message, return true so ThreadDetail can load the draft
+  const handleEditMessage = useCallback(
+    async (message: Message): Promise<boolean> => {
+      if (message.role !== "user") return false;
+      setSuggestions([]);
+      const rewound = await rewindThread(message.id, false);
+      return !!rewound;
+    },
+    [rewindThread]
+  );
+
   return (
     <ThreadDetail
       thread={selectedThread}
@@ -282,6 +293,7 @@ export default function ThreadPage() {
       onRenameThread={handleRenameThread}
       onRewind={handleRewind}
       onResendMessage={handleResendMessage}
+      onEditMessage={handleEditMessage}
       isStreaming={isStreaming}
       allAgents={agents}
       displayName={displayName}

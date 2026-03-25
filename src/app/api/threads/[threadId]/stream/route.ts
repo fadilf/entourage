@@ -3,12 +3,12 @@ import { getThread, addMessage, updateMessage, addUnreadAgent } from "@/lib/thre
 import { getProcessManager } from "@/lib/process-manager";
 import { createStreamParser } from "@/lib/stream-parser";
 import { MessageImage, ToolCall, ContentBlock, PermissionDenial, isAgentModel } from "@/lib/types";
-import { loadAgents, loadQuickReplies } from "@/lib/agent-store";
+import { loadAgents, loadDefaultCliModels, loadQuickReplies } from "@/lib/agent-store";
 import { buildContextualPrompt, buildFullHistoryPrompt } from "@/lib/context";
 import { QUICK_REPLY_INSTRUCTION, parseQuickReplies } from "@/lib/quick-replies";
 import { stripMentions, parseMentions } from "@/lib/mentions";
 import path from "path";
-import { getUploadsDir, ENTOURAGE_DIR, THREADS_DIR } from "@/lib/config";
+import { getUploadsDir, ENTOURAGE_DIR, THREADS_DIR, resolveCliModel } from "@/lib/config";
 import { resolveWorkspace } from "@/lib/workspace-context";
 import { resolvePermissionLevel } from "@/lib/permissions";
 import { captureSnapshot } from "@/lib/snapshots";
@@ -33,7 +33,11 @@ export async function POST(
   const threadPaths = attachedThreadIds?.map((id) => path.join(workspaceDir, ENTOURAGE_DIR, THREADS_DIR, `${id}.json`)) ?? [];
 
   // Resolve fresh agent data from store (picks up personality edits)
-  const allAgents = await loadAgents();
+  const [allAgents, defaultCliModels, quickRepliesConfig] = await Promise.all([
+    loadAgents(),
+    loadDefaultCliModels(),
+    loadQuickReplies(),
+  ]);
   const freshAgent = allAgents.find((a) => a.id === agentId);
   // Fall back to thread-stored agent data if agent was deleted
   const agent = freshAgent ?? thread.agents.find((a) => a.id === agentId);
@@ -141,9 +145,9 @@ export async function POST(
     (m) => m.role === "assistant" && m.agentId === agent.id && m.status === "complete"
   );
 
-  const quickRepliesConfig = await loadQuickReplies();
   const quickRepliesSuffix = quickRepliesConfig.enabled ? QUICK_REPLY_INSTRUCTION : "";
   const effectivePersonality = (agent.personality ?? "") + quickRepliesSuffix;
+  const effectiveCliModel = resolveCliModel(agentModel, agent.cliModel, defaultCliModels);
 
   const cleanPrompt = stripMentions(prompt, thread.agents);
   const enrichedPrompt = buildContextualPrompt(thread.messages, agent.id, thread.agents, cleanPrompt);
@@ -179,6 +183,7 @@ export async function POST(
           threadId,
           agent.id,
           agentModel,
+          effectiveCliModel,
           enrichedPrompt,
           cwd,
           // onData

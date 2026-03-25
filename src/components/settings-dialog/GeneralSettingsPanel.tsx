@@ -1,21 +1,35 @@
 "use client";
 
-import type { PermissionLevel } from "@/lib/types";
+import type { AgentModel, PermissionLevel } from "@/lib/types";
 import { Moon, Sun } from "lucide-react";
 import SettingsToggle from "./SettingsToggle";
 import { PERMISSION_LEVELS } from "./types";
+
+const DEFAULT_MODEL_FIELDS: ReadonlyArray<{
+  model: AgentModel;
+  label: string;
+  placeholder: string;
+}> = [
+  { model: "claude", label: "Claude", placeholder: "e.g. sonnet or claude-sonnet-4-6" },
+  { model: "gemini", label: "Gemini", placeholder: "e.g. gemini-2.5-pro" },
+  { model: "codex", label: "Codex", placeholder: "e.g. gpt-5.4" },
+];
 
 type GeneralSettingsPanelProps = {
   mounted: boolean;
   resolvedTheme?: string;
   displayName: string;
   savedDisplayName: string;
+  defaultCliModels: Record<AgentModel, string>;
+  savedDefaultCliModels: Record<AgentModel, string>;
   quickRepliesEnabled: boolean;
   toolCallGroupingEnabled: boolean;
   wsPermissionLevel: PermissionLevel;
   onToggleTheme: () => void;
   onDisplayNameChange: (value: string) => void;
   onSaveDisplayName: () => void | Promise<void>;
+  onDefaultCliModelChange: (model: AgentModel, value: string) => void;
+  onSaveDefaultCliModels: () => void | Promise<void>;
   onToggleQuickReplies: () => void | Promise<void>;
   onToggleToolCallGrouping: () => void | Promise<void>;
   onPermissionLevelChange: (value: PermissionLevel) => void | Promise<void>;
@@ -26,16 +40,24 @@ export default function GeneralSettingsPanel({
   resolvedTheme,
   displayName,
   savedDisplayName,
+  defaultCliModels,
+  savedDefaultCliModels,
   quickRepliesEnabled,
   toolCallGroupingEnabled,
   wsPermissionLevel,
   onToggleTheme,
   onDisplayNameChange,
   onSaveDisplayName,
+  onDefaultCliModelChange,
+  onSaveDefaultCliModels,
   onToggleQuickReplies,
   onToggleToolCallGrouping,
   onPermissionLevelChange,
 }: GeneralSettingsPanelProps) {
+  const hasDefaultCliModelChanges = DEFAULT_MODEL_FIELDS.some(
+    ({ model }) => defaultCliModels[model] !== savedDefaultCliModels[model]
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between px-3 py-2.5">
@@ -69,6 +91,44 @@ export default function GeneralSettingsPanel({
               Save
             </button>
           )}
+        </div>
+      </div>
+
+      <div className="px-3 py-2.5">
+        <div className="mb-3 flex items-start justify-between gap-4">
+          <div>
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Default Provider Models
+            </span>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500">
+              Used when an agent profile leaves Provider Model blank
+            </p>
+          </div>
+          {hasDefaultCliModelChanges && (
+            <button
+              onClick={onSaveDefaultCliModels}
+              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              Save
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          {DEFAULT_MODEL_FIELDS.map(({ model, label, placeholder }) => (
+            <div key={model} className="flex items-center gap-3">
+              <label className="w-16 shrink-0 text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                {label}
+              </label>
+              <input
+                type="text"
+                value={defaultCliModels[model]}
+                onChange={(e) => onDefaultCliModelChange(model, e.target.value)}
+                placeholder={placeholder}
+                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-1.5 font-mono text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
+              />
+            </div>
+          ))}
         </div>
       </div>
 

@@ -68,6 +68,18 @@ Produce structured output with sections. Be exhaustive but concise — facts ove
   },
 ];
 
+const MODEL_PLACEHOLDERS: Record<AgentFormData["model"], string> = {
+  claude: "Optional, e.g. sonnet or claude-sonnet-4-6",
+  gemini: "Optional, e.g. gemini-2.5-pro",
+  codex: "Optional, e.g. gpt-5.4",
+};
+
+const MODEL_HINTS: Record<AgentFormData["model"], string> = {
+  claude: "Leave blank to use the app default for Claude, or Claude Code's own default if none is set.",
+  gemini: "Leave blank to use the app default for Gemini, or Gemini CLI's own default if none is set.",
+  codex: "Leave blank to use the app default for Codex.",
+};
+
 
 type AgentFormPanelProps = {
   form: AgentFormData;
@@ -127,6 +139,18 @@ export default function AgentFormPanel({
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Provider Model</label>
+        <input
+          type="text"
+          value={form.cliModel}
+          onChange={(e) => onUpdate({ cliModel: e.target.value })}
+          placeholder={MODEL_PLACEHOLDERS[form.model]}
+          className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
+        />
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">{MODEL_HINTS[form.model]}</p>
       </div>
 
       <div>

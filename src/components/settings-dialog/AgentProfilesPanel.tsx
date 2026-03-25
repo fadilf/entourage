@@ -99,6 +99,7 @@ export default function AgentProfilesPanel({
             <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{agent.name}</span>
             <span className="text-xs text-zinc-500 dark:text-zinc-400">
               {agent.model}
+              {agent.cliModel && `:${agent.cliModel}`}
               {agent.isDefault && " · default"}
               {agent.personality && " · has personality"}
             </span>
