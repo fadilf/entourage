@@ -3,6 +3,7 @@ import {
   MCP_CATALOG,
   MCP_CATEGORIES,
   isCatalogEntryInstalled,
+  isCatalogEntryAdded,
   filterCatalog,
 } from "../mcp-catalog";
 
@@ -58,6 +59,53 @@ describe("mcp-catalog", () => {
 
     it("returns false for empty installed list", () => {
       expect(isCatalogEntryInstalled(stdioEntry, [])).toBe(false);
+    });
+  });
+
+  describe("isCatalogEntryAdded", () => {
+    const stdioEntry = MCP_CATALOG.find((e) => e.config.transport === "stdio")!;
+    const matchingServer = {
+      transport: "stdio" as const,
+      command: (stdioEntry.config as { command: string }).command,
+      args: (stdioEntry.config as { args: string[] }).args,
+    };
+
+    it("returns true when command+args match regardless of connection status", () => {
+      expect(isCatalogEntryAdded(stdioEntry, [matchingServer])).toBe(true);
+      // isCatalogEntryAdded ignores connected — verify via isCatalogEntryInstalled in three-state tests
+    });
+
+    it("returns false when no match", () => {
+      expect(isCatalogEntryAdded(stdioEntry, [
+        { transport: "stdio", command: "other", args: [] },
+      ])).toBe(false);
+    });
+
+    it("returns false for empty list", () => {
+      expect(isCatalogEntryAdded(stdioEntry, [])).toBe(false);
+    });
+  });
+
+  describe("three-state install logic", () => {
+    const entry = MCP_CATALOG.find((e) => e.config.transport === "stdio")!;
+    const cfg = entry.config as { command: string; args: string[] };
+
+    it("not added: isAdded=false, isInstalled=false", () => {
+      const servers: never[] = [];
+      expect(isCatalogEntryAdded(entry, servers)).toBe(false);
+      expect(isCatalogEntryInstalled(entry, servers)).toBe(false);
+    });
+
+    it("added but disconnected: isAdded=true, isInstalled=false", () => {
+      const servers = [{ transport: "stdio", command: cfg.command, args: cfg.args, connected: false }];
+      expect(isCatalogEntryAdded(entry, servers)).toBe(true);
+      expect(isCatalogEntryInstalled(entry, servers)).toBe(false);
+    });
+
+    it("added and connected: isAdded=true, isInstalled=true", () => {
+      const servers = [{ transport: "stdio", command: cfg.command, args: cfg.args, connected: true }];
+      expect(isCatalogEntryAdded(entry, servers)).toBe(true);
+      expect(isCatalogEntryInstalled(entry, servers)).toBe(true);
     });
   });
 

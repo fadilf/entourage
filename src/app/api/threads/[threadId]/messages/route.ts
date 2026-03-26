@@ -8,6 +8,7 @@ type ThreadMessageBody = {
   content?: string;
   images?: MessageImage[];
   attachedThreadIds?: string[];
+  attachedThreads?: { id: string; title: string }[];
 };
 
 export const POST = routeWithWorkspaceJson<{ threadId: string }, ThreadMessageBody>(
@@ -17,7 +18,7 @@ export const POST = routeWithWorkspaceJson<{ threadId: string }, ThreadMessageBo
       throw notFound("Thread not found");
   }
 
-    const { content = "", images, attachedThreadIds } = body;
+    const { content = "", images, attachedThreads } = body;
   if (!content?.trim() && (!images || images.length === 0)) {
       throw badRequest("content or images required");
   }
@@ -28,7 +29,7 @@ export const POST = routeWithWorkspaceJson<{ threadId: string }, ThreadMessageBo
     timestamp: new Date().toISOString(),
     status: "complete",
     ...(images && images.length > 0 ? { images } : {}),
-    ...(attachedThreadIds && attachedThreadIds.length > 0 ? { attachedThreads: attachedThreadIds } : {}),
+    ...(attachedThreads && attachedThreads.length > 0 ? { attachedThreads } : {}),
     });
 
     const allAgents = await loadAgents();

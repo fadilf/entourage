@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ThreadListItem, ThreadProcess } from "@/lib/types";
 import ModelIcon from "./ModelIcon";
 import AgentStatusBadge from "./AgentStatusBadge";
 import ContextMenu from "./ContextMenu";
-import { Menu, Archive, ArchiveRestore, ChevronRight, MoreHorizontal } from "lucide-react";
+import { Menu, Archive, ArchiveRestore, ChevronRight, MoreHorizontal, Pencil } from "lucide-react";
 
 function formatDate(timestamp: string) {
   const date = new Date(timestamp);
@@ -166,6 +166,7 @@ export default function ThreadList({
   unreadByThread,
   isMobile,
   workspaceName,
+  onRenameWorkspace,
 }: {
   threads: ThreadListItem[];
   selectedThreadId: string | null;
@@ -177,7 +178,9 @@ export default function ThreadList({
   unreadByThread?: Record<string, string[]>;
   isMobile?: boolean;
   workspaceName?: string;
+  onRenameWorkspace?: (name: string) => void;
 }) {
+  const workspaceNameRef = useRef<HTMLHeadingElement>(null);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -202,9 +205,50 @@ export default function ThreadList({
   return (
     <div className="flex h-full w-full flex-col border-r border-zinc-200 dark:border-zinc-700">
       <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-700">
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+        <h1
+          ref={workspaceNameRef}
+          contentEditable={!!onRenameWorkspace}
+          suppressContentEditableWarning
+          spellCheck={false}
+          className={`text-lg font-semibold text-zinc-900 dark:text-zinc-100 outline-none ${onRenameWorkspace ? (isMobile ? "truncate" : "cursor-pointer hover:text-zinc-600 dark:hover:text-zinc-300") : "truncate"} focus:cursor-text focus:hover:text-zinc-900 dark:focus:hover:text-zinc-100`}
+          onBlur={(e) => {
+            const trimmed = (e.currentTarget.textContent || "").trim();
+            if (trimmed && trimmed !== workspaceName && onRenameWorkspace) {
+              onRenameWorkspace(trimmed);
+            } else {
+              e.currentTarget.textContent = workspaceName || "Entourage";
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            } else if (e.key === "Escape") {
+              e.currentTarget.textContent = workspaceName || "Entourage";
+              e.currentTarget.blur();
+            }
+          }}
+          title={onRenameWorkspace && !isMobile ? "Click to rename" : undefined}
+        >
           {workspaceName || "Entourage"}
         </h1>
+        {isMobile && onRenameWorkspace && (
+          <button
+            onClick={() => {
+              const el = workspaceNameRef.current;
+              if (!el) return;
+              el.focus();
+              const range = document.createRange();
+              range.selectNodeContents(el);
+              const sel = window.getSelection();
+              sel?.removeAllRanges();
+              sel?.addRange(range);
+            }}
+            className="shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
         <div className="flex items-center gap-2">
           <button
             onClick={onNewThread}

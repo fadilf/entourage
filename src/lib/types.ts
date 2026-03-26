@@ -84,7 +84,7 @@ export type Message = {
   timestamp: string;
   status: "streaming" | "complete" | "error";
   images?: MessageImage[];
-  attachedThreads?: string[];  // Thread IDs attached as reference context
+  attachedThreads?: { id: string; title: string }[];  // Threads attached as reference context
   toolCalls?: ToolCall[];
   contentBlocks?: ContentBlock[];
   suggestions?: string[];

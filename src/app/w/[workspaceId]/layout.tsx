@@ -382,6 +382,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       unreadByThread={unreadByThread}
       isMobile={isMobile}
       workspaceName={activeWorkspaceName}
+      onRenameWorkspace={(name) => handleEditWorkspace(workspaceId, { name })}
     />
   );
 

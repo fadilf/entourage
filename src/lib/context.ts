@@ -24,7 +24,7 @@ export function buildFullHistoryPrompt(
 
   const lines = history.map((m) => {
     const imageNote = m.images && m.images.length > 0 ? ` [with ${m.images.length} image(s)]` : "";
-    const threadNote = m.attachedThreads && m.attachedThreads.length > 0 ? ` [with ${m.attachedThreads.length} attached thread(s)]` : "";
+    const threadNote = m.attachedThreads && m.attachedThreads.length > 0 ? ` [with ${m.attachedThreads.length} attached thread(s): ${m.attachedThreads.map((t) => typeof t === "string" ? t : t.title).join(", ")}]` : "";
     if (m.role === "user") {
       return `User: ${m.content}${imageNote}${threadNote}`;
     }
@@ -80,7 +80,7 @@ export function buildContextualPrompt(
 
   const lines = missed.map((m) => {
     const imageNote = m.images && m.images.length > 0 ? ` [with ${m.images.length} image(s)]` : "";
-    const threadNote = m.attachedThreads && m.attachedThreads.length > 0 ? ` [with ${m.attachedThreads.length} attached thread(s)]` : "";
+    const threadNote = m.attachedThreads && m.attachedThreads.length > 0 ? ` [with ${m.attachedThreads.length} attached thread(s): ${m.attachedThreads.map((t) => typeof t === "string" ? t : t.title).join(", ")}]` : "";
     if (m.role === "user") {
       return `User: ${m.content}${imageNote}${threadNote}`;
     }

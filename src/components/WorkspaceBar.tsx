@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Pencil, Trash2, FolderOpen, Settings, Palette, GitBranch, HelpCircle, Terminal } from "lucide-react";
+import { Plus, Pencil, Trash2, FolderOpen, Settings, Palette, GitBranch, HelpCircle, Terminal, Paintbrush } from "lucide-react";
 import AboutDialog from "./AboutDialog";
 import { Workspace, Icon } from "@/lib/types";
 import IconPicker, { renderIcon } from "./IconPicker";
 import Logo from "@/components/Logo";
+
+const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#06b6d4", "#84cc16"];
 
 type Props = {
   workspaces: Workspace[];
@@ -298,6 +300,29 @@ export default function WorkspaceBar({
             <Palette size={14} />
             Change Icon
           </button>
+          <div className="px-3 py-1.5">
+            <div className="flex items-center gap-2 text-sm text-zinc-200 mb-1.5">
+              <Paintbrush size={14} />
+              Background Color
+            </div>
+            <div className="flex gap-1.5">
+              {COLORS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => {
+                    onEditWorkspace(contextMenu.id, { color: c });
+                    setContextMenu(null);
+                  }}
+                  className={`w-5 h-5 rounded-md transition-all ${
+                    workspaces.find((w) => w.id === contextMenu.id)?.color === c
+                      ? "ring-2 ring-offset-1 ring-offset-zinc-800 ring-white scale-110"
+                      : "hover:scale-110"
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+          </div>
           {workspaces.find((w) => w.id === contextMenu.id)?.icon && (
             <button
               className="w-full px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 flex items-center gap-2 text-left"

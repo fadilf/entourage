@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { MessageSquare } from "lucide-react";
 import { AgentModel, Icon, Message } from "@/lib/types";
 import ModelIcon from "./ModelIcon";
 import ReactMarkdown from "react-markdown";
@@ -167,6 +168,22 @@ export default function MessageBubble({
             </span>
           )}
         </div>
+        {isOwn && message.attachedThreads && message.attachedThreads.length > 0 && (
+          <div className="mt-1 flex flex-wrap justify-end gap-1">
+            {message.attachedThreads.map((t) => {
+              const thread = typeof t === "string" ? { id: t, title: t } : t;
+              return (
+                <span
+                  key={thread.id}
+                  className="inline-flex items-center gap-1 rounded-md bg-white/15 px-1.5 py-0.5 text-[10px] text-white/70"
+                >
+                  <MessageSquare className="h-2.5 w-2.5" />
+                  {thread.title}
+                </span>
+              );
+            })}
+          </div>
+        )}
         <span className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">
           {formatTime(message.timestamp)}
         </span>

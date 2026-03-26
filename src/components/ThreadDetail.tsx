@@ -38,7 +38,7 @@ export default function ThreadDetail({
 }: {
   thread: ThreadWithMessages | null;
   streamingMessages: Map<string, { agentId: string; content: string; toolCalls?: import("@/lib/types").ToolCall[]; contentBlocks?: import("@/lib/types").ContentBlock[]; isReattach?: boolean }>;
-  onSendMessage: (content: string, images?: MessageImage[], attachedThreadIds?: string[]) => void;
+  onSendMessage: (content: string, images?: MessageImage[], attachedThreads?: { id: string; title: string }[]) => void;
   onStop: (agentId: string) => void;
   onRenameThread?: (title: string) => void;
   isStreaming: boolean;

@@ -16,7 +16,7 @@ function msg(overrides: Partial<Message> & Pick<Message, "role" | "content">): M
     status: overrides.status ?? "complete",
     agentId: overrides.agentId,
     images: overrides.images,
-    attachedThreads: overrides.attachedThreads,
+    attachedThreads: overrides.attachedThreads as Message["attachedThreads"],
   } as Message;
 }
 

@@ -150,7 +150,7 @@ export default function MessageInput({
   threadId: string;
   agents: Agent[];
   allAgents?: Agent[];
-  onSendMessage: (content: string, images?: MessageImage[], attachedThreadIds?: string[]) => void;
+  onSendMessage: (content: string, images?: MessageImage[], attachedThreads?: { id: string; title: string }[]) => void;
   onStop?: (agentId: string) => void;
   disabled?: boolean;
   isMobile?: boolean;
@@ -330,11 +330,11 @@ export default function MessageInput({
       setUploading(false);
     }
 
-    const attachedThreadIds = pendingThreads.length > 0
-      ? pendingThreads.map((t) => t.id)
+    const attachedThreads = pendingThreads.length > 0
+      ? pendingThreads
       : undefined;
 
-    onSendMessage(content.trim(), images, attachedThreadIds);
+    onSendMessage(content.trim(), images, attachedThreads);
     updateDraft("");
     setShowMentions(false);
 
@@ -598,22 +598,25 @@ export default function MessageInput({
                             key={t.id}
                             onClick={() => !isDisabled && toggleThread({ id: t.id, title: t.title })}
                             disabled={isDisabled}
-                            className={`flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                            className={`flex w-full items-start gap-2 px-3 py-2 text-sm transition-colors ${
                               isDisabled
                                 ? "opacity-40 cursor-not-allowed"
                                 : "hover:bg-zinc-100 dark:hover:bg-zinc-700"
                             } ${isSelected ? "bg-violet-50 dark:bg-violet-900/20" : ""}`}
                           >
-                            <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                            <div className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
                               isSelected
                                 ? "border-violet-500 bg-violet-500 text-white"
                                 : "border-zinc-300 dark:border-zinc-600"
                             }`}>
                               {isSelected && <Check className="h-3 w-3" />}
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="truncate text-zinc-700 dark:text-zinc-300">{t.title}</span>
+                            <div className="min-w-0 flex-1 text-left">
+                              <span className="block truncate text-zinc-700 dark:text-zinc-300">{t.title}</span>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                                  {new Date(t.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                                </span>
                                 <div className="flex -space-x-1 shrink-0">
                                   {t.agents.slice(0, 3).map((a) => (
                                     <div
@@ -624,9 +627,6 @@ export default function MessageInput({
                                     />
                                   ))}
                                 </div>
-                              </div>
-                              <div className="text-[10px] text-zinc-400 dark:text-zinc-500">
-                                {new Date(t.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                               </div>
                             </div>
                           </button>

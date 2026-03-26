@@ -1,5 +1,7 @@
 import path from "path";
-import { Agent, AgentModel, CliModelDefaults, PermissionLevel } from "./types";
+import os from "os";
+import { writeFileSync, mkdirSync } from "fs";
+import { Agent, AgentModel, CliModelDefaults, McpServerConfig, PermissionLevel } from "./types";
 
 export const ENTOURAGE_DIR = ".entourage";
 export const THREADS_DIR = "threads";
@@ -47,7 +49,40 @@ export function resolveCliModel(
   return cliModel?.trim() || defaultCliModels[model];
 }
 
-export function getCliCommand(model: AgentModel, prompt: string, sessionId: string, isResume: boolean, personality?: string, cliModel?: string, imagePaths?: string[], permissionLevel: PermissionLevel = "full", threadPaths?: string[]): { cmd: string; args: string[] } {
+const MCP_CONFIG_DIR = path.join(os.tmpdir(), "entourage-mcp");
+
+/**
+ * Write MCP server configs to a temp JSON file in the format Claude CLI expects.
+ * Returns the file path, or undefined if no servers are configured.
+ */
+export function writeMcpConfigFile(servers: McpServerConfig[]): string | undefined {
+  if (servers.length === 0) return undefined;
+
+  const mcpServers: Record<string, Record<string, unknown>> = {};
+  for (const server of servers) {
+    if (server.transport === "stdio" && server.command) {
+      mcpServers[server.name] = {
+        command: server.command,
+        args: server.args ?? [],
+        ...(server.env && Object.keys(server.env).length > 0 ? { env: server.env } : {}),
+      };
+    } else if (server.transport === "sse" && server.url) {
+      mcpServers[server.name] = {
+        type: "http",
+        url: server.url,
+      };
+    }
+  }
+
+  if (Object.keys(mcpServers).length === 0) return undefined;
+
+  mkdirSync(MCP_CONFIG_DIR, { recursive: true });
+  const configPath = path.join(MCP_CONFIG_DIR, "mcp-servers.json");
+  writeFileSync(configPath, JSON.stringify({ mcpServers }, null, 2));
+  return configPath;
+}
+
+export function getCliCommand(model: AgentModel, prompt: string, sessionId: string, isResume: boolean, personality?: string, cliModel?: string, imagePaths?: string[], permissionLevel: PermissionLevel = "full", threadPaths?: string[], mcpConfigPath?: string): { cmd: string; args: string[] } {
   const hasImages = imagePaths && imagePaths.length > 0;
   const effectiveCliModel = resolveCliModel(model, cliModel);
 
@@ -96,6 +131,9 @@ export function getCliCommand(model: AgentModel, prompt: string, sessionId: stri
     }
     if (effectiveCliModel) {
       args.push("--model", effectiveCliModel);
+    }
+    if (mcpConfigPath) {
+      args.push("--mcp-config", mcpConfigPath);
     }
     return { cmd: "claude", args };
   }

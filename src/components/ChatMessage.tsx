@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { memo, useState, useRef, useCallback } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, MessageSquare } from "lucide-react";
 import { Message, PermissionLevel, ContentBlock, ToolCall } from "@/lib/types";
 import { parseQuickReplies } from "@/lib/quick-replies";
 import ReactMarkdown from "react-markdown";
@@ -373,6 +373,24 @@ export default memo(function ChatMessage({
               />
             </a>
           ))}
+        </div>
+      )}
+
+      {/* Attached threads indicator for user messages */}
+      {isUser && message.attachedThreads && message.attachedThreads.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {message.attachedThreads.map((t) => {
+            const thread = typeof t === "string" ? { id: t, title: t } : t;
+            return (
+              <span
+                key={thread.id}
+                className="inline-flex items-center gap-1 rounded-md bg-zinc-100 dark:bg-zinc-700/60 px-2 py-0.5 text-xs text-zinc-500 dark:text-zinc-400"
+              >
+                <MessageSquare className="h-3 w-3" />
+                {thread.title}
+              </span>
+            );
+          })}
         </div>
       )}
 

@@ -8,7 +8,8 @@ import { buildContextualPrompt, buildFullHistoryPrompt } from "@/lib/context";
 import { QUICK_REPLY_INSTRUCTION, parseQuickReplies } from "@/lib/quick-replies";
 import { stripMentions, parseMentions } from "@/lib/mentions";
 import path from "path";
-import { getUploadsDir, ENTOURAGE_DIR, THREADS_DIR, resolveCliModel } from "@/lib/config";
+import { getUploadsDir, ENTOURAGE_DIR, THREADS_DIR, resolveCliModel, writeMcpConfigFile } from "@/lib/config";
+import { loadMcpServers } from "@/lib/mcp-store";
 import { resolveWorkspace } from "@/lib/workspace-context";
 import { resolvePermissionLevel } from "@/lib/permissions";
 import { captureSnapshot } from "@/lib/snapshots";
@@ -33,11 +34,13 @@ export async function POST(
   const threadPaths = attachedThreadIds?.map((id) => path.join(workspaceDir, ENTOURAGE_DIR, THREADS_DIR, `${id}.json`)) ?? [];
 
   // Resolve fresh agent data from store (picks up personality edits)
-  const [allAgents, defaultCliModels, quickRepliesConfig] = await Promise.all([
+  const [allAgents, defaultCliModels, quickRepliesConfig, mcpServers] = await Promise.all([
     loadAgents(),
     loadDefaultCliModels(),
     loadQuickReplies(),
+    loadMcpServers(),
   ]);
+  const mcpConfigPath = writeMcpConfigFile(mcpServers);
   const freshAgent = allAgents.find((a) => a.id === agentId);
   // Fall back to thread-stored agent data if agent was deleted
   const agent = freshAgent ?? thread.agents.find((a) => a.id === agentId);
@@ -397,7 +400,8 @@ export async function POST(
           imagePaths.length > 0 ? imagePaths : undefined,
           fullHistoryPrompt,
           permissionLevel,
-          threadPaths.length > 0 ? threadPaths : undefined
+          threadPaths.length > 0 ? threadPaths : undefined,
+          mcpConfigPath
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";

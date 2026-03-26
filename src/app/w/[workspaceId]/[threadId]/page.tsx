@@ -177,14 +177,14 @@ export default function ThreadPage() {
 
   // Send message
   const sendUserMessage = useCallback(
-    async (content: string, images?: MessageImage[], attachedThreadIds?: string[]) => {
+    async (content: string, images?: MessageImage[], attachedThreads?: { id: string; title: string }[]) => {
       const res = await fetch(wsUrl(`/api/threads/${threadId}/messages`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
           ...(images && images.length > 0 ? { images } : {}),
-          ...(attachedThreadIds && attachedThreadIds.length > 0 ? { attachedThreadIds } : {}),
+          ...(attachedThreads && attachedThreads.length > 0 ? { attachedThreads } : {}),
         }),
       });
 
@@ -207,6 +207,7 @@ export default function ThreadPage() {
         refetchThreads();
       }
 
+      const attachedThreadIds = attachedThreads?.map((t) => t.id);
       sendMessage(content, targetAgents, images, attachedThreadIds);
       return true;
     },
@@ -214,9 +215,9 @@ export default function ThreadPage() {
   );
 
   const handleSendMessage = useCallback(
-    async (content: string, images?: MessageImage[], attachedThreadIds?: string[]) => {
+    async (content: string, images?: MessageImage[], attachedThreads?: { id: string; title: string }[]) => {
       setSuggestions([]);
-      await sendUserMessage(content, images, attachedThreadIds);
+      await sendUserMessage(content, images, attachedThreads);
     },
     [sendUserMessage]
   );

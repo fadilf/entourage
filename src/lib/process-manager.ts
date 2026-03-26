@@ -112,7 +112,8 @@ class ProcessManager {
     imagePaths?: string[],
     fullHistoryPrompt?: string,
     permissionLevel: PermissionLevel = "full",
-    threadPaths?: string[]
+    threadPaths?: string[],
+    mcpConfigPath?: string
   ): ChildProcess {
     const k = this.key(threadId, agentId);
 
@@ -126,7 +127,7 @@ class ProcessManager {
     // After rewind, use full history prompt so the fresh session has full context
     const effectivePrompt = (!isResume && wasRewound && fullHistoryPrompt) ? fullHistoryPrompt : prompt;
 
-    const { cmd, args } = getCliCommand(model, effectivePrompt, sessionId, isResume, personality, cliModel, imagePaths, permissionLevel, threadPaths);
+    const { cmd, args } = getCliCommand(model, effectivePrompt, sessionId, isResume, personality, cliModel, imagePaths, permissionLevel, threadPaths, mcpConfigPath);
 
     const child = cpSpawn(cmd, args, {
       cwd,
@@ -225,7 +226,7 @@ class ProcessManager {
           this.processes.delete(k);
           // Use full history prompt so the fresh session has conversation context
           const retryPrompt = fullHistoryPrompt || prompt;
-          const fresh = getCliCommand(model, retryPrompt, sessionId, false, personality, cliModel, imagePaths, permissionLevel, threadPaths);
+          const fresh = getCliCommand(model, retryPrompt, sessionId, false, personality, cliModel, imagePaths, permissionLevel, threadPaths, mcpConfigPath);
           const retryChild = cpSpawn(fresh.cmd, fresh.args, {
             cwd,
             stdio: ["ignore", "pipe", "pipe"],
