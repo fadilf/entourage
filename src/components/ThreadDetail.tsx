@@ -361,6 +361,7 @@ export default function ThreadDetail({
           suggestions={suggestions ?? []}
           loading={false}
           onSelect={(text) => onSuggestionSelect?.(text)}
+          onEdit={(text) => setEditDraft(text)}
           className={`${isMobile ? "px-4" : "px-6"} pt-2 pb-0.5`}
         />
         <MessageInput
