@@ -111,6 +111,23 @@ export default function McpAppBlock({
         return;
       }
 
+      // After init completes, send tool input/result to the app
+      if (data?.method === "ui/notifications/initialized") {
+        if (toolInput) {
+          iframe.contentWindow?.postMessage(
+            { jsonrpc: "2.0", method: "ui/notifications/tool-input", params: { input: toolInput } },
+            "*"
+          );
+        }
+        if (toolResult) {
+          iframe.contentWindow?.postMessage(
+            { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { result: toolResult } },
+            "*"
+          );
+        }
+        return;
+      }
+
       if (data?.method === "ui/notifications/size-changed") {
         const params = data.params ?? data;
         if (typeof params.height === "number") {
