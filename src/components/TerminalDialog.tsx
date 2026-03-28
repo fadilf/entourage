@@ -335,7 +335,7 @@ export default function TerminalDialog({
   return (
     <Dialog open={open} onClose={handleClose}>
       <div
-        className="flex w-full max-w-5xl flex-col rounded-xl bg-zinc-900 shadow-xl mx-4"
+        className="flex w-full max-w-5xl flex-col rounded-xl bg-zinc-900 shadow-xl mx-4 overflow-hidden"
         style={{ height: "75vh", maxHeight: 700 }}
         onClick={(e) => e.stopPropagation()}
       >
