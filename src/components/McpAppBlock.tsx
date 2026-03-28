@@ -182,7 +182,7 @@ export default function McpAppBlock({
       <iframe
         ref={iframeRef}
         srcDoc={html}
-        sandbox="allow-scripts allow-forms"
+        sandbox="allow-scripts allow-forms allow-same-origin"
         style={{ width: "100%", height: expanded ? "600px" : `${iframeHeight}px`, border: "none" }}
         title={`MCP App: ${toolName}`}
       />
