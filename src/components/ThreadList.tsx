@@ -21,10 +21,12 @@ function formatDate(timestamp: string) {
 
 function highlightMatch(text: string, query: string): React.ReactNode {
   if (!query.trim()) return text;
-  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escaped})`, "gi");
   const parts = text.split(regex);
+  const lowerQuery = query.toLowerCase();
   return parts.map((part, i) =>
-    regex.test(part) ? (
+    part.toLowerCase() === lowerQuery ? (
       <mark key={i} className="bg-yellow-200 dark:bg-yellow-800 text-inherit rounded-sm">
         {part}
       </mark>
@@ -250,9 +252,10 @@ export default function ThreadList({
         const data = await res.json();
         setSearchResults(data);
       } catch (err: unknown) {
-        if (err instanceof Error && err.name !== "AbortError") {
-          setSearchResults([]);
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
         }
+        setSearchResults([]);
       } finally {
         setIsSearching(false);
       }
