@@ -116,8 +116,13 @@ class McpClientManager {
     const direct = this.appToolIndex.get(toolName);
     if (direct) return direct;
     // Claude CLI prefixes MCP tools as mcp__<server>__<tool>
-    const mcpMatch = toolName.match(/^mcp__[^_]+__(.+)$/);
-    if (mcpMatch) return this.appToolIndex.get(mcpMatch[1]);
+    // Server names may contain underscores (e.g. "Interactive_Maps"), so split on __ and take last part
+    if (toolName.startsWith("mcp__")) {
+      const lastSep = toolName.lastIndexOf("__");
+      if (lastSep > 4) {
+        return this.appToolIndex.get(toolName.slice(lastSep + 2));
+      }
+    }
     return undefined;
   }
 
