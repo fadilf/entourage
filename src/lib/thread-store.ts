@@ -89,9 +89,11 @@ function extractSnippet(text: string, query: string, maxLength: number = 120): s
   const index = lowerText.indexOf(lowerQuery);
   if (index === -1) return text.slice(0, maxLength);
 
-  const padding = Math.floor((maxLength - query.length) / 2);
+  // Reserve space for ellipsis characters so total never exceeds maxLength
+  const sliceMax = maxLength - 2;
+  const padding = Math.floor((sliceMax - query.length) / 2);
   const start = Math.max(0, index - padding);
-  const end = Math.min(text.length, start + maxLength);
+  const end = Math.min(text.length, start + sliceMax);
 
   let snippet = text.slice(start, end);
   if (start > 0) snippet = "…" + snippet;
@@ -100,6 +102,7 @@ function extractSnippet(text: string, query: string, maxLength: number = 120): s
 }
 
 export async function searchThreads(workspaceDir: string, query: string): Promise<ThreadSearchResult[]> {
+  if (!query.trim()) return [];
   await ensureEntourageDir(workspaceDir);
   const dir = getThreadsDir(workspaceDir);
   let files: string[];
@@ -117,7 +120,10 @@ export async function searchThreads(workspaceDir: string, query: string): Promis
     try {
       const raw = await readFile(path.join(dir, file), "utf-8");
       const data = JSON.parse(raw) as ThreadWithMessages;
-      sanitizeThreadAgents(data);
+      const changed = sanitizeThreadAgents(data);
+      if (changed) {
+        await writeFile(path.join(dir, file), JSON.stringify(data, null, 2));
+      }
 
       const messages = data.messages ?? [];
       const lastMsg = messages[messages.length - 1];
