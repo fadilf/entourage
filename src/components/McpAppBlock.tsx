@@ -120,12 +120,20 @@ export default function McpAppBlock({
             );
           }
           if (toolResult) {
-            // MCP App SDK expects params.content as an array of content blocks
-            const content = Array.isArray(toolResult.content)
-              ? toolResult.content
-              : [{ type: "text", text: JSON.stringify(toolResult) }];
+            // Send the raw tool result as the CallToolResult params.
+            // Apps may read from content, structuredContent, or _meta depending on their implementation.
             iframe.contentWindow?.postMessage(
-              { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { content } },
+              {
+                jsonrpc: "2.0",
+                method: "ui/notifications/tool-result",
+                params: {
+                  content: Array.isArray(toolResult.content)
+                    ? toolResult.content
+                    : [{ type: "text", text: JSON.stringify(toolResult) }],
+                  structuredContent: toolResult,
+                  _meta: toolResult,
+                },
+              },
               "*"
             );
           }
