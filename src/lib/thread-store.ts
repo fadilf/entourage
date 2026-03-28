@@ -1,7 +1,7 @@
 import { readdir, readFile, writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { ENTOURAGE_DIR, THREADS_DIR } from "./config";
-import { Thread, Message, ThreadWithMessages, ThreadListItem, Agent, PermissionLevel, isAgentModel } from "./types";
+import { Thread, Message, ThreadWithMessages, ThreadListItem, ThreadSearchResult, Agent, PermissionLevel, isAgentModel } from "./types";
 import { getProcessManager } from "./process-manager";
 import { createKeyedWriteLock } from "./write-lock";
 
@@ -81,6 +81,91 @@ export async function listThreads(workspaceDir: string): Promise<ThreadListItem[
 
   items.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   return items;
+}
+
+function extractSnippet(text: string, query: string, maxLength: number = 120): string {
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const index = lowerText.indexOf(lowerQuery);
+  if (index === -1) return text.slice(0, maxLength);
+
+  const padding = Math.floor((maxLength - query.length) / 2);
+  const start = Math.max(0, index - padding);
+  const end = Math.min(text.length, start + maxLength);
+
+  let snippet = text.slice(start, end);
+  if (start > 0) snippet = "…" + snippet;
+  if (end < text.length) snippet = snippet + "…";
+  return snippet;
+}
+
+export async function searchThreads(workspaceDir: string, query: string): Promise<ThreadSearchResult[]> {
+  await ensureEntourageDir(workspaceDir);
+  const dir = getThreadsDir(workspaceDir);
+  let files: string[];
+  try {
+    files = await readdir(dir);
+  } catch {
+    return [];
+  }
+
+  const lowerQuery = query.toLowerCase();
+  const results: ThreadSearchResult[] = [];
+
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue;
+    try {
+      const raw = await readFile(path.join(dir, file), "utf-8");
+      const data = JSON.parse(raw) as ThreadWithMessages;
+      sanitizeThreadAgents(data);
+
+      const messages = data.messages ?? [];
+      const lastMsg = messages[messages.length - 1];
+      const titleMatches = data.title.toLowerCase().includes(lowerQuery);
+
+      // Search messages for first match
+      let messageMatch: string | null = null;
+      for (const msg of messages) {
+        if (msg.content.toLowerCase().includes(lowerQuery)) {
+          messageMatch = msg.content;
+          break;
+        }
+      }
+
+      if (!titleMatches && !messageMatch) continue;
+
+      const base: ThreadListItem = {
+        id: data.id,
+        title: data.title,
+        agents: data.agents,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        archived: data.archived,
+        unreadAgents: data.unreadAgents || [],
+        lastMessagePreview: lastMsg?.content?.slice(0, 100) ?? "",
+        messageCount: messages.length,
+      };
+
+      if (messageMatch) {
+        results.push({
+          ...base,
+          matchSnippet: extractSnippet(messageMatch, query),
+          matchSource: "message",
+        });
+      } else {
+        results.push({
+          ...base,
+          matchSnippet: data.title,
+          matchSource: "title",
+        });
+      }
+    } catch {
+      // Skip corrupt files
+    }
+  }
+
+  results.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  return results;
 }
 
 export async function getThread(workspaceDir: string, id: string): Promise<ThreadWithMessages | null> {

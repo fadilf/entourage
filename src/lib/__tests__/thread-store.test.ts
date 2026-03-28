@@ -19,6 +19,7 @@ import {
   truncateAfterMessage,
   truncateBeforeMessage,
   updateThreadPermissionLevel,
+  searchThreads,
 } from "../thread-store";
 import { Agent } from "../types";
 
@@ -317,6 +318,103 @@ describe("thread-store", () => {
       // Verify it was persisted
       const raw = JSON.parse(await readFile(threadPath, "utf-8"));
       expect(raw.agents).toHaveLength(1);
+    });
+  });
+
+  describe("searchThreads", () => {
+    it("matches thread title", async () => {
+      await createThread(workspaceDir, "Deploy Pipeline", agents);
+      await createThread(workspaceDir, "Bug Fix", agents);
+
+      const results = await searchThreads(workspaceDir, "deploy");
+      expect(results).toHaveLength(1);
+      expect(results[0].title).toBe("Deploy Pipeline");
+      expect(results[0].matchSource).toBe("title");
+      expect(results[0].matchSnippet).toBe("Deploy Pipeline");
+    });
+
+    it("matches message content", async () => {
+      const thread = await createThread(workspaceDir, "Chat", agents);
+      await addMessage(workspaceDir, thread.id, {
+        role: "user",
+        content: "How do I configure the database connection?",
+        timestamp: new Date().toISOString(),
+        status: "complete",
+      });
+
+      const results = await searchThreads(workspaceDir, "database");
+      expect(results).toHaveLength(1);
+      expect(results[0].matchSource).toBe("message");
+      expect(results[0].matchSnippet).toContain("database");
+    });
+
+    it("is case-insensitive", async () => {
+      const thread = await createThread(workspaceDir, "Chat", agents);
+      await addMessage(workspaceDir, thread.id, {
+        role: "user",
+        content: "Check the README file",
+        timestamp: new Date().toISOString(),
+        status: "complete",
+      });
+
+      const results = await searchThreads(workspaceDir, "readme");
+      expect(results).toHaveLength(1);
+    });
+
+    it("prefers message snippet when both title and message match", async () => {
+      const thread = await createThread(workspaceDir, "Database Setup", agents);
+      await addMessage(workspaceDir, thread.id, {
+        role: "user",
+        content: "The database connection string is in .env",
+        timestamp: new Date().toISOString(),
+        status: "complete",
+      });
+
+      const results = await searchThreads(workspaceDir, "database");
+      expect(results).toHaveLength(1);
+      expect(results[0].matchSource).toBe("message");
+    });
+
+    it("returns empty array when no matches", async () => {
+      await createThread(workspaceDir, "Chat", agents);
+      const results = await searchThreads(workspaceDir, "nonexistent");
+      expect(results).toHaveLength(0);
+    });
+
+    it("returns results sorted by updatedAt descending", async () => {
+      const t1 = await createThread(workspaceDir, "Alpha search term", agents);
+      await new Promise((r) => setTimeout(r, 10));
+      const t2 = await createThread(workspaceDir, "Beta search term", agents);
+
+      const results = await searchThreads(workspaceDir, "search term");
+      expect(results).toHaveLength(2);
+      expect(results[0].id).toBe(t2.id);
+      expect(results[1].id).toBe(t1.id);
+    });
+
+    it("includes archived threads in results", async () => {
+      const thread = await createThread(workspaceDir, "Old Work", agents);
+      await archiveThread(workspaceDir, thread.id, true);
+
+      const results = await searchThreads(workspaceDir, "old work");
+      expect(results).toHaveLength(1);
+      expect(results[0].archived).toBe(true);
+    });
+
+    it("generates snippet with context around match", async () => {
+      const thread = await createThread(workspaceDir, "Chat", agents);
+      const longContent = "A".repeat(80) + " findme " + "B".repeat(80);
+      await addMessage(workspaceDir, thread.id, {
+        role: "user",
+        content: longContent,
+        timestamp: new Date().toISOString(),
+        status: "complete",
+      });
+
+      const results = await searchThreads(workspaceDir, "findme");
+      expect(results).toHaveLength(1);
+      expect(results[0].matchSnippet).toContain("findme");
+      expect(results[0].matchSnippet.length).toBeLessThanOrEqual(150);
     });
   });
 

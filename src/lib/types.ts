@@ -107,6 +107,11 @@ export type ThreadListItem = Thread & {
   messageCount: number;
 };
 
+export type ThreadSearchResult = ThreadListItem & {
+  matchSnippet: string;
+  matchSource: "title" | "message";
+};
+
 export type Workspace = {
   id: string;
   name: string;
