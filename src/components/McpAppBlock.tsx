@@ -72,6 +72,45 @@ export default function McpAppBlock({
 
       const data = event.data;
 
+      // MCP App SDK initialization handshake — must respond or the app times out
+      if (data?.method === "ui/initialize") {
+        iframe.contentWindow?.postMessage(
+          {
+            jsonrpc: "2.0",
+            id: data.id,
+            result: {
+              protocolVersion: data.params?.protocolVersion ?? "2026-01-26",
+              hostInfo: { name: "entourage", version: "0.1.0" },
+              hostCapabilities: {
+                serverTools: { listChanged: true },
+                openLinks: {},
+              },
+              hostContext: {
+                toolInfo: {
+                  tool: {
+                    name: toolName,
+                    inputSchema: { type: "object" },
+                  },
+                },
+                ...(toolInput ? { toolInput } : {}),
+                ...(toolResult ? { toolResult } : {}),
+              },
+            },
+          },
+          "*"
+        );
+        return;
+      }
+
+      // Acknowledge context updates (no-op but must respond)
+      if (data?.method === "ui/update-model-context") {
+        iframe.contentWindow?.postMessage(
+          { jsonrpc: "2.0", id: data.id, result: {} },
+          "*"
+        );
+        return;
+      }
+
       if (data?.method === "ui/notifications/size-changed") {
         const params = data.params ?? data;
         if (typeof params.height === "number") {
