@@ -92,8 +92,6 @@ export default function McpAppBlock({
                     inputSchema: { type: "object" },
                   },
                 },
-                ...(toolInput ? { toolInput } : {}),
-                ...(toolResult ? { toolResult } : {}),
               },
             },
           },
@@ -112,19 +110,22 @@ export default function McpAppBlock({
       }
 
       // After init completes, send tool input/result to the app
+      // Use setTimeout to ensure the app has processed its own init before receiving data
       if (data?.method === "ui/notifications/initialized") {
-        if (toolInput) {
-          iframe.contentWindow?.postMessage(
-            { jsonrpc: "2.0", method: "ui/notifications/tool-input", params: { input: toolInput } },
-            "*"
-          );
-        }
-        if (toolResult) {
-          iframe.contentWindow?.postMessage(
-            { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { result: toolResult } },
-            "*"
-          );
-        }
+        setTimeout(() => {
+          if (toolInput) {
+            iframe.contentWindow?.postMessage(
+              { jsonrpc: "2.0", method: "ui/notifications/tool-input", params: { arguments: toolInput } },
+              "*"
+            );
+          }
+          if (toolResult) {
+            iframe.contentWindow?.postMessage(
+              { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { result: toolResult } },
+              "*"
+            );
+          }
+        }, 100);
         return;
       }
 
