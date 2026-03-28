@@ -120,8 +120,12 @@ export default function McpAppBlock({
             );
           }
           if (toolResult) {
+            // MCP App SDK expects params.content as an array of content blocks
+            const content = Array.isArray(toolResult.content)
+              ? toolResult.content
+              : [{ type: "text", text: JSON.stringify(toolResult) }];
             iframe.contentWindow?.postMessage(
-              { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { result: toolResult } },
+              { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { content } },
               "*"
             );
           }
