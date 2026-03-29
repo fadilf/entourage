@@ -2,13 +2,33 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Pencil, Trash2, FolderOpen, Settings, Palette, GitBranch, HelpCircle, Terminal, Paintbrush } from "lucide-react";
+import { Plus, Trash2, FolderOpen, Settings, Palette, GitBranch, HelpCircle, Terminal, Paintbrush } from "lucide-react";
 import AboutDialog from "./AboutDialog";
 import { Workspace, Icon } from "@/lib/types";
 import IconPicker, { renderIcon } from "./IconPicker";
 import Logo from "@/components/Logo";
 
-const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#06b6d4", "#84cc16"];
+const LIGHT_GRADIENTS = [
+  "linear-gradient(135deg, #a78bfa, #818cf8)",
+  "linear-gradient(135deg, #60a5fa, #38bdf8)",
+  "linear-gradient(135deg, #34d399, #2dd4bf)",
+  "linear-gradient(135deg, #fbbf24, #f59e0b)",
+  "linear-gradient(135deg, #fb923c, #f97316)",
+  "linear-gradient(135deg, #f472b6, #e879f9)",
+  "linear-gradient(135deg, #38bdf8, #34d399)",
+  "linear-gradient(135deg, #a78bfa, #f472b6)",
+];
+
+const DARK_GRADIENTS = [
+  "linear-gradient(135deg, #7c3aed, #4f46e5)",
+  "linear-gradient(135deg, #2563eb, #0284c7)",
+  "linear-gradient(135deg, #059669, #0d9488)",
+  "linear-gradient(135deg, #d97706, #b45309)",
+  "linear-gradient(135deg, #ea580c, #c2410c)",
+  "linear-gradient(135deg, #db2777, #c026d3)",
+  "linear-gradient(135deg, #0369a1, #0f766e)",
+  "linear-gradient(135deg, #6d28d9, #be185d)",
+];
 
 type Props = {
   workspaces: Workspace[];
@@ -217,7 +237,7 @@ export default function WorkspaceBar({
                       ? "rounded-2xl shadow-lg shadow-black/30 scale-105"
                       : "hover:rounded-2xl hover:brightness-110"
                   } ${dragId === ws.id ? "opacity-40" : ""}`}
-                  style={{ backgroundColor: ws.color }}
+                  style={{ background: ws.color }}
                 >
                   {ws.icon ? renderIcon(ws.icon, "h-5 w-5") : getInitials(ws.name)}
                 </button>
@@ -279,20 +299,6 @@ export default function WorkspaceBar({
           <button
             className="w-full px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 flex items-center gap-2 text-left"
             onClick={() => {
-              const ws = workspaces.find((w) => w.id === contextMenu.id);
-              if (ws) {
-                setEditName(ws.name);
-                setEditing(contextMenu.id);
-              }
-              setContextMenu(null);
-            }}
-          >
-            <Pencil size={14} />
-            Rename
-          </button>
-          <button
-            className="w-full px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 flex items-center gap-2 text-left"
-            onClick={() => {
               setContextMenu(null);
               setIconPickerFor(contextMenu.id);
             }}
@@ -305,22 +311,41 @@ export default function WorkspaceBar({
               <Paintbrush size={14} />
               Background Color
             </div>
-            <div className="flex gap-1.5">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => {
-                    onEditWorkspace(contextMenu.id, { color: c });
-                    setContextMenu(null);
-                  }}
-                  className={`w-5 h-5 rounded-md transition-all ${
-                    workspaces.find((w) => w.id === contextMenu.id)?.color === c
-                      ? "ring-2 ring-offset-1 ring-offset-zinc-800 ring-white scale-110"
-                      : "hover:scale-110"
-                  }`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
+            <div className="space-y-1.5">
+              <div className="flex gap-1.5">
+                {LIGHT_GRADIENTS.map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => {
+                      onEditWorkspace(contextMenu.id, { color: g });
+                      setContextMenu(null);
+                    }}
+                    className={`w-5 h-5 rounded-md transition-all ${
+                      workspaces.find((w) => w.id === contextMenu.id)?.color === g
+                        ? "ring-2 ring-offset-1 ring-offset-zinc-800 ring-white scale-110"
+                        : "hover:scale-110"
+                    }`}
+                    style={{ background: g }}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                {DARK_GRADIENTS.map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => {
+                      onEditWorkspace(contextMenu.id, { color: g });
+                      setContextMenu(null);
+                    }}
+                    className={`w-5 h-5 rounded-md transition-all ${
+                      workspaces.find((w) => w.id === contextMenu.id)?.color === g
+                        ? "ring-2 ring-offset-1 ring-offset-zinc-800 ring-white scale-110"
+                        : "hover:scale-110"
+                    }`}
+                    style={{ background: g }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
           {workspaces.find((w) => w.id === contextMenu.id)?.icon && (
