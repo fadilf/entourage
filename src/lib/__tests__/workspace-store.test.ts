@@ -73,7 +73,7 @@ describe("workspace-store logic patterns", () => {
     type Item = { id: string; icon?: { type: string; name: string } };
 
     it("null removes the icon", () => {
-      const item: Item = { id: "1", icon: { type: "lucide", name: "Zap" } };
+      const item: Item = { id: "1", icon: { type: "phosphor", name: "Zap" } };
       const updates: { icon?: { type: string; name: string } | null } = { icon: null };
 
       if (updates.icon === null) {
@@ -86,7 +86,7 @@ describe("workspace-store logic patterns", () => {
     });
 
     it("undefined leaves the icon unchanged", () => {
-      const original = { type: "lucide", name: "Zap" };
+      const original = { type: "phosphor", name: "Zap" };
       const item: Item = { id: "1", icon: original };
       const updates: { icon?: { type: string; name: string } | null } = {};
 
@@ -100,7 +100,7 @@ describe("workspace-store logic patterns", () => {
     });
 
     it("a value replaces the icon", () => {
-      const item: Item = { id: "1", icon: { type: "lucide", name: "Zap" } };
+      const item: Item = { id: "1", icon: { type: "phosphor", name: "Zap" } };
       const newIcon = { type: "emoji", name: "🎉" };
       const updates: { icon?: { type: string; name: string } | null } = { icon: newIcon };
 

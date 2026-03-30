@@ -36,15 +36,16 @@ export const POST = routeWithWorkspaceJson<{ threadId: string }, ThreadMessageBo
     const mentionedAgents = parseMentions(content, allAgents);
     const fallbackAgent = thread.agents[0] ?? allAgents[0];
 
+    // TODO: re-enable coordinator routing after next release
     // When a coordinator is set and 2+ agents are mentioned, route through coordinator only
     let targetAgents: typeof mentionedAgents;
-    if (mentionedAgents.length > 1 && thread.coordinatorId) {
-      const coordinator = mentionedAgents.find((a) => a.id === thread.coordinatorId)
-        ?? allAgents.find((a) => a.id === thread.coordinatorId);
-      targetAgents = coordinator ? [coordinator] : mentionedAgents;
-    } else {
+    // if (mentionedAgents.length > 1 && thread.coordinatorId) {
+    //   const coordinator = mentionedAgents.find((a) => a.id === thread.coordinatorId)
+    //     ?? allAgents.find((a) => a.id === thread.coordinatorId);
+    //   targetAgents = coordinator ? [coordinator] : mentionedAgents;
+    // } else {
       targetAgents = mentionedAgents.length > 0 ? mentionedAgents : fallbackAgent ? [fallbackAgent] : [];
-    }
+    // }
     if (targetAgents.length === 0) {
       throw badRequest("No agents available");
     }

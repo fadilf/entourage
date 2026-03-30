@@ -92,7 +92,7 @@ export default function MobileMenuDrawer({
                   >
                     <div
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white"
-                      style={{ backgroundColor: ws.color }}
+                      style={{ background: ws.color }}
                     >
                       {ws.icon ? renderIcon(ws.icon, "h-4 w-4") : getInitials(ws.name)}
                     </div>

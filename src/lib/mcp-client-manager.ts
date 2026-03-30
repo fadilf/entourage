@@ -145,7 +145,7 @@ class McpClientManager {
   async callTool(serverId: string, toolName: string, args: Record<string, unknown>): Promise<unknown> {
     const conn = this.connections.get(serverId);
     if (!conn) throw new Error(`MCP server ${serverId} not connected`);
-    return conn.client.callTool({ name: toolName, arguments: args });
+    return conn.client.callTool({ name: toolName, arguments: args }, undefined, { timeout: 120000 });
   }
 
   getConnectionStatus(): Array<{ serverId: string; connected: boolean; toolCount: number }> {

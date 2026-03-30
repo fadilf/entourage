@@ -313,12 +313,13 @@ export default function ThreadPage() {
       permissionLevel={effectivePermissionLevel}
       onChangePermissionLevel={handleChangePermissionLevel}
       workspaceThreads={threads.length > 0 ? threads : undefined}
-      coordinatorId={selectedThread?.coordinatorId ?? null}
-      onChangeCoordinator={handleChangeCoordinator}
-      maxAutoDispatches={selectedThread?.maxAutoDispatches}
-      onChangeMaxAutoDispatches={handleChangeMaxAutoDispatches}
-      autoDispatchPaused={autoDispatchPaused}
-      onResumeAutoDispatch={resetAutoDispatch}
+      // TODO: re-enable coordinator after next release
+      // coordinatorId={selectedThread?.coordinatorId ?? null}
+      // onChangeCoordinator={handleChangeCoordinator}
+      // maxAutoDispatches={selectedThread?.maxAutoDispatches}
+      // onChangeMaxAutoDispatches={handleChangeMaxAutoDispatches}
+      // autoDispatchPaused={autoDispatchPaused}
+      // onResumeAutoDispatch={resetAutoDispatch}
     />
   );
 }

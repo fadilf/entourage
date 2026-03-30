@@ -16,7 +16,7 @@ export type PermissionDenial = {
 };
 
 export type Icon =
-  | { type: "lucide"; name: string }
+  | { type: "phosphor"; name: string }
   | { type: "emoji"; value: string }
   | { type: "image"; imageId: string; ext: string };
 

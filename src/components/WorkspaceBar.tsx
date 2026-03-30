@@ -9,6 +9,7 @@ import IconPicker, { renderIcon } from "./IconPicker";
 import Logo from "@/components/Logo";
 
 const LIGHT_GRADIENTS = [
+  "linear-gradient(135deg, #f5f5f4, #e7e5e4)",
   "linear-gradient(135deg, #a78bfa, #818cf8)",
   "linear-gradient(135deg, #60a5fa, #38bdf8)",
   "linear-gradient(135deg, #34d399, #2dd4bf)",
@@ -20,6 +21,7 @@ const LIGHT_GRADIENTS = [
 ];
 
 const DARK_GRADIENTS = [
+  "linear-gradient(135deg, #27272a, #18181b)",
   "linear-gradient(135deg, #7c3aed, #4f46e5)",
   "linear-gradient(135deg, #2563eb, #0284c7)",
   "linear-gradient(135deg, #059669, #0d9488)",
@@ -313,14 +315,14 @@ export default function WorkspaceBar({
             </div>
             <div className="space-y-1.5">
               <div className="flex gap-1.5">
-                {LIGHT_GRADIENTS.map((g) => (
+                {LIGHT_GRADIENTS.map((g, i) => (
                   <button
                     key={g}
                     onClick={() => {
                       onEditWorkspace(contextMenu.id, { color: g });
                       setContextMenu(null);
                     }}
-                    className={`w-5 h-5 rounded-md transition-all ${
+                    className={`w-5 h-5 rounded-md transition-all ${i === 0 ? "border border-zinc-500" : ""} ${
                       workspaces.find((w) => w.id === contextMenu.id)?.color === g
                         ? "ring-2 ring-offset-1 ring-offset-zinc-800 ring-white scale-110"
                         : "hover:scale-110"

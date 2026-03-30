@@ -28,12 +28,12 @@ class TerminalManager {
     // Fall back to home dir if cwd doesn't exist (e.g. deleted workspace)
     const safeCwd = fs.existsSync(cwd) ? cwd : os.homedir();
 
-    const pty = ptySpawn(shell, [], {
+    const pty = ptySpawn(shell, ["--login"], {
       name: "xterm-256color",
       cols: 80,
       rows: 24,
       cwd: safeCwd,
-      env: { ...process.env } as Record<string, string>,
+      env: { ...process.env, COLORTERM: "truecolor" } as Record<string, string>,
     });
 
     const session: TerminalSession = {

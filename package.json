@@ -29,6 +29,7 @@
     "@mcp-ui/client": "^7.0.0",
     "@modelcontextprotocol/ext-apps": "^1.2.2",
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "@phosphor-icons/react": "^2.1.10",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "lucide-react": "^0.577.0",
@@ -43,14 +44,14 @@
     "simple-git": "^3.33.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "20.19.37",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5",
+    "typescript": "5.9.3",
     "vitest": "^4.1.0"
   }
 }
