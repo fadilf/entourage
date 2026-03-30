@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Agent, AgentModel, PermissionLevel } from "@/lib/types";
+import { Agent, AgentModel, Icon, PermissionLevel } from "@/lib/types";
 import Dialog from "./Dialog";
 import { useTheme } from "next-themes";
 import { useWorkspaceId } from "@/contexts/WorkspaceContext";
@@ -54,6 +54,10 @@ export default function SettingsDialog({
   useEffect(() => setMounted(true), []);
   const [displayName, setDisplayName] = useState("");
   const [savedDisplayName, setSavedDisplayName] = useState("");
+  const [userIcon, setUserIcon] = useState<Icon | undefined>(undefined);
+  const [savedUserIcon, setSavedUserIcon] = useState<Icon | undefined>(undefined);
+  const [userColor, setUserColor] = useState("#7c3aed");
+  const [savedUserColor, setSavedUserColor] = useState("#7c3aed");
   const [defaultCliModels, setDefaultCliModels] = useState<Record<AgentModel, string>>(EMPTY_DEFAULT_CLI_MODELS);
   const [savedDefaultCliModels, setSavedDefaultCliModels] = useState<Record<AgentModel, string>>(EMPTY_DEFAULT_CLI_MODELS);
   const [plugins, setPlugins] = useState<Record<string, boolean>>({});
@@ -97,6 +101,15 @@ export default function SettingsDialog({
       if (data.toolCallGrouping) {
         setToolCallGroupingEnabled(data.toolCallGrouping.enabled);
       }
+      if (data.userIcon !== undefined) {
+        setUserIcon(data.userIcon);
+        setSavedUserIcon(data.userIcon);
+      } else {
+        setUserIcon(undefined);
+        setSavedUserIcon(undefined);
+      }
+      setUserColor(data.userColor || "#7c3aed");
+      setSavedUserColor(data.userColor || "#7c3aed");
     }
   }, []);
 
@@ -125,6 +138,20 @@ export default function SettingsDialog({
       const data = await res.json();
       setSavedDisplayName(data.displayName);
       setDisplayName(data.displayName);
+    }
+  };
+
+  const handleSaveUserProfile = async () => {
+    const res = await patchConfig({
+      userIcon: userIcon ?? null,
+      userColor,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setSavedUserIcon(data.userIcon);
+      setUserIcon(data.userIcon);
+      setSavedUserColor(data.userColor || "#7c3aed");
+      setUserColor(data.userColor || "#7c3aed");
     }
   };
 
@@ -315,6 +342,13 @@ export default function SettingsDialog({
             resolvedTheme={resolvedTheme}
             displayName={displayName}
             savedDisplayName={savedDisplayName}
+            userIcon={userIcon}
+            userColor={userColor || "#7c3aed"}
+            savedUserIcon={savedUserIcon}
+            savedUserColor={savedUserColor || "#7c3aed"}
+            onUserIconChange={(icon) => setUserIcon(icon ?? undefined)}
+            onUserColorChange={setUserColor}
+            onSaveUserProfile={handleSaveUserProfile}
             defaultCliModels={defaultCliModels}
             savedDefaultCliModels={savedDefaultCliModels}
             quickRepliesEnabled={quickRepliesEnabled}

@@ -1,9 +1,10 @@
 "use client";
 
-import type { AgentModel, PermissionLevel } from "@/lib/types";
-import { Moon, Sun } from "lucide-react";
+import type { AgentModel, Icon, PermissionLevel } from "@/lib/types";
+import { Moon, Sun, X } from "lucide-react";
 import SettingsToggle from "./SettingsToggle";
-import { PERMISSION_LEVELS } from "./types";
+import { COLOR_PRESETS, PERMISSION_LEVELS } from "./types";
+import IconPicker, { renderIcon } from "../IconPicker";
 
 const DEFAULT_MODEL_FIELDS: ReadonlyArray<{
   model: AgentModel;
@@ -25,6 +26,13 @@ type GeneralSettingsPanelProps = {
   quickRepliesEnabled: boolean;
   toolCallGroupingEnabled: boolean;
   wsPermissionLevel: PermissionLevel;
+  userIcon?: Icon;
+  userColor: string;
+  savedUserIcon?: Icon;
+  savedUserColor: string;
+  onUserIconChange: (icon: Icon | null) => void;
+  onUserColorChange: (color: string) => void;
+  onSaveUserProfile: () => void | Promise<void>;
   onToggleTheme: () => void;
   onDisplayNameChange: (value: string) => void;
   onSaveDisplayName: () => void | Promise<void>;
@@ -40,6 +48,13 @@ export default function GeneralSettingsPanel({
   resolvedTheme,
   displayName,
   savedDisplayName,
+  userIcon,
+  userColor,
+  savedUserIcon,
+  savedUserColor,
+  onUserIconChange,
+  onUserColorChange,
+  onSaveUserProfile,
   defaultCliModels,
   savedDefaultCliModels,
   quickRepliesEnabled,
@@ -71,6 +86,91 @@ export default function GeneralSettingsPanel({
             {resolvedTheme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
         )}
+      </div>
+
+      {/* Profile section */}
+      <div className="px-3 py-2.5">
+        <div className="mb-3 flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {/* Live avatar preview */}
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
+              style={{
+                backgroundColor: "var(--background)",
+                border: `1.5px solid ${userColor}`,
+                boxShadow: `inset 0 2px 6px ${userColor}80`,
+              }}
+            >
+              {userIcon ? (
+                renderIcon(userIcon, "h-5 w-5")
+              ) : (
+                <span className="text-sm font-semibold" style={{ color: userColor }}>
+                  {displayName
+                    .trim()
+                    .split(/\s+/)
+                    .map((w) => w[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase() || "?"}
+                </span>
+              )}
+            </div>
+            <div>
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Profile</span>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">Customize your chat avatar</p>
+            </div>
+          </div>
+          {(userIcon !== savedUserIcon || userColor !== savedUserColor) && (
+            <button
+              onClick={onSaveUserProfile}
+              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              Save
+            </button>
+          )}
+        </div>
+
+        {/* Color swatches */}
+        <div className="mb-3">
+          <label className="mb-1.5 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Color</label>
+          <div className="flex flex-wrap items-center gap-2">
+            {COLOR_PRESETS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => onUserColorChange(color)}
+                className={`h-7 w-7 rounded-full transition-transform ${
+                  userColor === color
+                    ? "scale-110 ring-2 ring-zinc-900 ring-offset-2 dark:ring-zinc-100 dark:ring-offset-zinc-800"
+                    : "hover:scale-105"
+                }`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Icon picker */}
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Icon</label>
+            {userIcon && (
+              <button
+                type="button"
+                onClick={() => onUserIconChange(null)}
+                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+              >
+                <X className="h-3 w-3" />
+                Remove
+              </button>
+            )}
+          </div>
+          <IconPicker
+            value={userIcon}
+            onChange={(icon) => onUserIconChange(icon)}
+            enableUpload
+          />
+        </div>
       </div>
 
       <div className="flex items-center justify-between px-3 py-2.5">
