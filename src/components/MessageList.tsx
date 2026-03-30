@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { Message, Agent, PermissionLevel } from "@/lib/types";
+import { Message, Agent, Icon, PermissionLevel } from "@/lib/types";
 import MessageGroup, { MessageGroupData } from "./MessageGroup";
 
 const GROUP_GAP_MS = 5 * 60 * 1000; // 5 minutes
@@ -32,6 +32,8 @@ export default memo(function MessageList({
   messages,
   agents,
   displayName,
+  userIcon,
+  userColor,
   onContextMenu,
   permissionLevel,
   onChangePermissionLevel,
@@ -39,6 +41,8 @@ export default memo(function MessageList({
   messages: Message[];
   agents: Agent[];
   displayName?: string;
+  userIcon?: Icon;
+  userColor?: string;
   onContextMenu?: (message: Message, x: number, y: number) => void;
   permissionLevel?: PermissionLevel;
   onChangePermissionLevel?: (level: PermissionLevel) => void;
@@ -64,6 +68,8 @@ export default memo(function MessageList({
             isUser={isUser}
             isStreaming={isStreaming}
             displayName={displayName}
+            userIcon={userIcon}
+            userColor={userColor}
             onContextMenu={onContextMenu}
             permissionLevel={permissionLevel}
             onChangePermissionLevel={onChangePermissionLevel}

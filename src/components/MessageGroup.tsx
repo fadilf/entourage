@@ -1,7 +1,8 @@
 "use client";
 
-import { Message, Agent, PermissionLevel } from "@/lib/types";
+import { Message, Agent, Icon, PermissionLevel } from "@/lib/types";
 import ModelIcon from "./ModelIcon";
+import { renderIcon } from "./IconPicker";
 import ChatMessage from "./ChatMessage";
 
 function formatTime(timestamp: string) {
@@ -9,6 +10,14 @@ function formatTime(timestamp: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return (words[0]?.[0] || "?").toUpperCase();
 }
 
 export type MessageGroupData = {
@@ -22,6 +31,8 @@ export default function MessageGroup({
   isUser,
   isStreaming,
   displayName = "You",
+  userIcon,
+  userColor = "#7c3aed",
   onContextMenu,
   permissionLevel,
   onChangePermissionLevel,
@@ -31,6 +42,8 @@ export default function MessageGroup({
   isUser: boolean;
   isStreaming: boolean;
   displayName?: string;
+  userIcon?: Icon;
+  userColor?: string;
   onContextMenu?: (message: Message, x: number, y: number) => void;
   permissionLevel?: PermissionLevel;
   onChangePermissionLevel?: (level: PermissionLevel) => void;
@@ -43,10 +56,14 @@ export default function MessageGroup({
       <div className="flex gap-2.5 px-4">
         {/* Avatar */}
         <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${isUser ? "bg-zinc-900 dark:bg-zinc-600" : ""}`}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
           style={
             isUser
-              ? undefined
+              ? {
+                  backgroundColor: "var(--background)",
+                  border: `1.5px solid ${userColor}`,
+                  boxShadow: `inset 0 2px 6px ${userColor}80`,
+                }
               : {
                   backgroundColor: "var(--background)",
                   border: `1.5px solid ${agent?.avatarColor || "#71717a"}`,
@@ -55,7 +72,13 @@ export default function MessageGroup({
           }
         >
           {isUser ? (
-            <span className="text-xs font-semibold text-white">{displayName.charAt(0).toUpperCase()}</span>
+            userIcon ? (
+              renderIcon(userIcon, "h-4 w-4")
+            ) : (
+              <span className="text-xs font-semibold" style={{ color: userColor }}>
+                {getInitials(displayName)}
+              </span>
+            )
           ) : agent ? (
             <ModelIcon
               model={agent.model}

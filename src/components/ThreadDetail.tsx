@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ThreadWithMessages, Agent, Message, MessageImage, PermissionLevel, ThreadListItem } from "@/lib/types";
+import { ThreadWithMessages, Agent, Message, MessageImage, Icon, PermissionLevel, ThreadListItem } from "@/lib/types";
 import { ChevronLeft, Copy, Pencil, RotateCcw, Send, ShieldCheck, ShieldAlert, Shield, RefreshCw, Repeat } from "lucide-react";
 import Dialog from "./Dialog";
 import MessageList from "./MessageList";
@@ -18,6 +18,8 @@ export default function ThreadDetail({
   isStreaming,
   allAgents,
   displayName,
+  userIcon,
+  userColor,
   isMobile,
   onBack,
   onRewind,
@@ -44,6 +46,8 @@ export default function ThreadDetail({
   isStreaming: boolean;
   allAgents?: Agent[];
   displayName?: string;
+  userIcon?: Icon;
+  userColor?: string;
   isMobile?: boolean;
   onBack?: () => void;
   onRewind?: (messageId: string, options?: { keepMessage?: boolean; revertCode?: boolean }) => Promise<void> | void;
@@ -351,6 +355,8 @@ export default function ThreadDetail({
           messages={allMessages}
           agents={thread.agents}
           displayName={displayName}
+          userIcon={userIcon}
+          userColor={userColor}
           onContextMenu={handleContextMenu}
           permissionLevel={permissionLevel}
           onChangePermissionLevel={onChangePermissionLevel}

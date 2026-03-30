@@ -15,6 +15,8 @@ export default function ThreadPage() {
     wsUrl,
     agents,
     displayName,
+    userIcon,
+    userColor,
     quickRepliesEnabled,
     refetchThreads,
     threads,
@@ -298,6 +300,8 @@ export default function ThreadPage() {
       isStreaming={isStreaming}
       allAgents={agents}
       displayName={displayName}
+      userIcon={userIcon}
+      userColor={userColor}
       isMobile={isMobile}
       onBack={isMobile ? () => router.back() : undefined}
       suggestions={quickRepliesEnabled && !isStreaming ? suggestions : []}
