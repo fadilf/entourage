@@ -84,7 +84,7 @@ export default function MessageBubble({
           renderIcon(userIcon, "h-4 w-4")
         ) : (
           <span className="text-xs font-semibold" style={{ color: userColor }}>
-            {displayName.charAt(0).toUpperCase()}
+            {displayName.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?"}
           </span>
         )
       ) : model ? (
