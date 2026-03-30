@@ -1,6 +1,6 @@
-import { loadAgents, loadDefaultCliModels, loadDisplayName, saveDefaultCliModels, saveDisplayName, loadPlugins, savePlugins, loadQuickReplies, saveQuickReplies, loadToolCallGrouping, saveToolCallGrouping } from "@/lib/agent-store";
+import { loadAgents, loadDefaultCliModels, loadDisplayName, loadUserIcon, loadUserColor, saveDefaultCliModels, saveDisplayName, saveUserIcon, saveUserColor, loadPlugins, savePlugins, loadQuickReplies, saveQuickReplies, loadToolCallGrouping, saveToolCallGrouping } from "@/lib/agent-store";
 import { route, routeWithJson } from "@/lib/api-route";
-import type { CliModelDefaults } from "@/lib/types";
+import type { CliModelDefaults, Icon } from "@/lib/types";
 
 type ConfigBody = {
   displayName?: string;
@@ -8,18 +8,22 @@ type ConfigBody = {
   plugins?: Record<string, boolean>;
   quickRepliesEnabled?: boolean;
   toolCallGroupingEnabled?: boolean;
+  userIcon?: Icon | null;
+  userColor?: string;
 };
 
 export const GET = route(async () => {
-  const [agents, displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping] = await Promise.all([
+  const [agents, displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor] = await Promise.all([
     loadAgents(),
     loadDisplayName(),
     loadDefaultCliModels(),
     loadPlugins(),
     loadQuickReplies(),
     loadToolCallGrouping(),
+    loadUserIcon(),
+    loadUserColor(),
   ]);
-  return { agents, displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping };
+  return { agents, displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor };
 });
 
 export const PATCH = routeWithJson<Record<string, never>, ConfigBody>(async ({ body }) => {
@@ -43,12 +47,22 @@ export const PATCH = routeWithJson<Record<string, never>, ConfigBody>(async ({ b
     await saveToolCallGrouping({ enabled: body.toolCallGroupingEnabled });
   }
 
-  const [displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping] = await Promise.all([
+  if (body.userIcon !== undefined) {
+    await saveUserIcon(body.userIcon);
+  }
+
+  if (typeof body.userColor === "string") {
+    await saveUserColor(body.userColor);
+  }
+
+  const [displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor] = await Promise.all([
     loadDisplayName(),
     loadDefaultCliModels(),
     loadPlugins(),
     loadQuickReplies(),
     loadToolCallGrouping(),
+    loadUserIcon(),
+    loadUserColor(),
   ]);
-  return { displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping };
+  return { displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor };
 });
