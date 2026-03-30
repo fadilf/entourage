@@ -69,6 +69,7 @@ class ProcessManager {
   private usedSessions = new Set<string>(); // Track sessions that have been used
   private killedSessions = new Set<string>(); // Track sessions killed intentionally
   private sessionOverrides = new Map<string, string>(); // Override sessionId after rewind
+  private codexSessionIds = new Map<string, string>(); // Captured real Codex thread_ids
 
   private key(threadId: string, agentId: string): string {
     return `${threadId}:${agentId}`;
@@ -90,7 +91,26 @@ class ProcessManager {
 
   private getSessionId(threadId: string, agentId: string): string {
     const k = this.key(threadId, agentId);
-    return this.sessionOverrides.get(k) ?? this.baseSessionId(threadId, agentId);
+    // For Codex, prefer the real session ID captured from thread.started events
+    return this.codexSessionIds.get(k) ?? this.sessionOverrides.get(k) ?? this.baseSessionId(threadId, agentId);
+  }
+
+  /**
+   * Parse Codex JSONL stdout for thread.started events to capture the real session ID.
+   * Codex generates its own session ID internally — we must capture and reuse it for resume.
+   */
+  private captureCodexSessionId(chunk: string, key: string): void {
+    for (const line of chunk.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const json = JSON.parse(trimmed);
+        if (json.type === "thread.started" && typeof json.thread_id === "string") {
+          this.codexSessionIds.set(key, json.thread_id);
+          return;
+        }
+      } catch { /* not JSON */ }
+    }
   }
 
   private newSessionId(): string {
@@ -158,6 +178,11 @@ class ProcessManager {
       entry.buffer.push(chunk);
       if (entry.buffer.length > MAX_BUFFER_CHUNKS) {
         entry.buffer.shift();
+      }
+
+      // Capture Codex's real session ID from thread.started events
+      if (model === "codex") {
+        this.captureCodexSessionId(chunk, k);
       }
 
       if (deferredChunks) {
@@ -249,6 +274,10 @@ class ProcessManager {
             const chunk = data.toString();
             retryEntry.buffer.push(chunk);
             if (retryEntry.buffer.length > MAX_BUFFER_CHUNKS) retryEntry.buffer.shift();
+            // Capture Codex's real session ID from retry
+            if (model === "codex") {
+              this.captureCodexSessionId(chunk, k);
+            }
             onData(chunk);
           });
           retryChild.stderr?.on("data", (data: Buffer) => {
@@ -364,6 +393,7 @@ class ProcessManager {
       const oldSessionId = this.getSessionId(threadId, agentId);
       this.usedSessions.delete(oldSessionId);
       this.killedSessions.add(oldSessionId);
+      this.codexSessionIds.delete(k);
       this.sessionOverrides.set(k, this.newSessionId());
     }
   }
