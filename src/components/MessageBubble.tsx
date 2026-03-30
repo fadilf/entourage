@@ -4,6 +4,7 @@ import Image from "next/image";
 import { MessageSquare } from "lucide-react";
 import { AgentModel, Icon, Message } from "@/lib/types";
 import ModelIcon from "./ModelIcon";
+import { renderIcon } from "./IconPicker";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -42,6 +43,9 @@ export default function MessageBubble({
   avatarColor,
   model,
   icon,
+  userIcon,
+  userColor = "#7c3aed",
+  displayName = "You",
 }: {
   message: Message;
   isOwn: boolean;
@@ -49,19 +53,44 @@ export default function MessageBubble({
   avatarColor?: string;
   model?: AgentModel;
   icon?: Icon;
+  userIcon?: Icon;
+  userColor?: string;
+  displayName?: string;
 }) {
   const wsParam = useWsParam();
   const avatar = (
     <div
       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-        model ? "bg-zinc-100 dark:bg-zinc-800" : "bg-violet-600 text-white"
+        !isOwn && !model ? "bg-violet-600 text-white" : ""
       }`}
-      style={model ? { border: `1.5px solid ${avatarColor}`, boxShadow: `inset 0 2px 6px ${avatarColor}80` } : undefined}
+      style={
+        isOwn
+          ? {
+              backgroundColor: "var(--background)",
+              border: `1.5px solid ${userColor}`,
+              boxShadow: `inset 0 2px 6px ${userColor}80`,
+            }
+          : model
+            ? {
+                backgroundColor: "var(--background)",
+                border: `1.5px solid ${avatarColor}`,
+                boxShadow: `inset 0 2px 6px ${avatarColor}80`,
+              }
+            : undefined
+      }
     >
-      {model ? (
+      {isOwn ? (
+        userIcon ? (
+          renderIcon(userIcon, "h-4 w-4")
+        ) : (
+          <span className="text-xs font-semibold" style={{ color: userColor }}>
+            {displayName.charAt(0).toUpperCase()}
+          </span>
+        )
+      ) : model ? (
         <ModelIcon model={model} icon={icon} className="h-4 w-4" />
       ) : (
-        <span className="text-xs font-semibold">Y</span>
+        <span className="text-xs font-semibold">?</span>
       )}
     </div>
   );
