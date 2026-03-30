@@ -114,11 +114,13 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   }, [sidebarWidth]);
 
   // Config
-  const [config, , refetchConfig] = useFetch<{ agents: Agent[]; displayName?: string; quickReplies?: { enabled: boolean }; toolCallGrouping?: { enabled: boolean } }>("/api/config");
+  const [config, , refetchConfig] = useFetch<{ agents: Agent[]; displayName?: string; quickReplies?: { enabled: boolean }; toolCallGrouping?: { enabled: boolean }; userIcon?: Icon; userColor?: string }>("/api/config");
   const agents = config?.agents ?? [];
   const displayName = config?.displayName ?? "You";
   const quickRepliesEnabled = config?.quickReplies?.enabled ?? false;
   const toolCallGroupingEnabled = config?.toolCallGrouping?.enabled ?? false;
+  const userIcon = config?.userIcon;
+  const userColor = config?.userColor ?? "#7c3aed";
 
   const enabledPlugins = useMemo(() => {
     if (!config) return [];
@@ -294,6 +296,8 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     refetchThreads,
     agents,
     displayName,
+    userIcon,
+    userColor,
     quickRepliesEnabled,
     toolCallGroupingEnabled,
     refetchConfig,

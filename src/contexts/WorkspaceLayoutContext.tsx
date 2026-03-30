@@ -16,6 +16,8 @@ export interface WorkspaceLayoutContextValue {
   // Config
   agents: Agent[];
   displayName: string;
+  userIcon?: Icon;
+  userColor: string;
   quickRepliesEnabled: boolean;
   toolCallGroupingEnabled: boolean;
   refetchConfig: () => void;
