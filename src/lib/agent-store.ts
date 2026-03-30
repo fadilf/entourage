@@ -3,7 +3,7 @@ import path from "path";
 import os from "os";
 import crypto from "crypto";
 import { DEFAULT_AGENTS, DEFAULT_AGENT_IDS, DEFAULT_CLI_MODELS } from "./config";
-import { Agent, AgentModel, CliModelDefaults, isAgentModel } from "./types";
+import { Agent, AgentModel, CliModelDefaults, Icon, isAgentModel } from "./types";
 import { createWriteLock } from "./write-lock";
 
 type QuickRepliesConfig = { enabled: boolean };
@@ -11,6 +11,8 @@ type ToolCallGroupingConfig = { enabled: boolean };
 type Config = {
   agents: Agent[];
   displayName?: string;
+  userIcon?: Icon;
+  userColor?: string;
   plugins?: Record<string, boolean>;
   quickReplies?: QuickRepliesConfig;
   toolCallGrouping?: ToolCallGroupingConfig;
@@ -149,6 +151,33 @@ export async function loadDisplayName(): Promise<string> {
 export async function saveDisplayName(displayName: string): Promise<void> {
   const config = await loadConfig();
   await saveConfig({ ...config, displayName: displayName || undefined });
+}
+
+export const DEFAULT_USER_COLOR = "#7c3aed";
+
+export async function loadUserIcon(): Promise<Icon | undefined> {
+  const config = await loadConfig();
+  return config.userIcon;
+}
+
+export async function loadUserColor(): Promise<string> {
+  const config = await loadConfig();
+  return config.userColor || DEFAULT_USER_COLOR;
+}
+
+export async function saveUserIcon(userIcon: Icon | null): Promise<void> {
+  const config = await loadConfig();
+  if (userIcon === null) {
+    const { userIcon: _, ...rest } = config;
+    await saveConfig(rest as Config);
+  } else {
+    await saveConfig({ ...config, userIcon });
+  }
+}
+
+export async function saveUserColor(userColor: string): Promise<void> {
+  const config = await loadConfig();
+  await saveConfig({ ...config, userColor });
 }
 
 export async function loadDefaultCliModels(): Promise<CliModelDefaults> {
