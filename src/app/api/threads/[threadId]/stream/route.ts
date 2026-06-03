@@ -54,15 +54,21 @@ export async function POST(
 
   const pm = getProcessManager();
 
-  // Check if already running — re-attach
+  // Re-attach to a process that's already producing output. For a persistent
+  // Claude session we re-attach only with an empty prompt (a real prompt starts
+  // a new queued turn instead — see below). Non-persistent agents re-attach on
+  // any repeat send (they can't accept a mid-run prompt).
   const existing = pm.getProcess(threadId, agentId);
-  if (existing) {
+  const shouldReattach = existing && (!prompt || !existing.persistent);
+  if (existing && shouldReattach) {
+    const isPersistent = !!existing.persistent;
     // Return existing buffer as SSE stream then continue piping
     const reattachParser = createStreamParser(agentModel);
     const stream = new ReadableStream({
       start(controller) {
         const encoder = new TextEncoder();
         let clientDisconnected = false;
+        let finished = false;
         request.signal.addEventListener("abort", () => {
           clientDisconnected = true;
         });
@@ -78,22 +84,11 @@ export async function POST(
           );
         }
 
-        // Pipe future output through parser
-        existing.process.stdout?.on("data", (data: Buffer) => {
-          try {
-            const events = reattachParser(data.toString());
-            for (const event of events) {
-              if (event.type === "content" || event.type.startsWith("tool_")) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-              }
-            }
-          } catch {
-            // Controller closed
-          }
-        });
-
-        existing.process.on("close", (code) => {
-          const status = code === 0 ? "complete" : "error";
+        const finish = (status: "complete" | "error") => {
+          if (finished) return;
+          finished = true;
+          existing.process.stdout?.off("data", onStdout);
+          existing.process.off("close", onClose);
           if (clientDisconnected && status === "complete") {
             addUnreadAgent(workspaceDir, threadId, agentId).catch(() => {});
           }
@@ -103,7 +98,42 @@ export async function POST(
           } catch {
             // Already closed
           }
-        });
+        };
+
+        // Pipe future output through parser. For a persistent session the
+        // process does not exit at turn end, so detect the `result` event to
+        // close this re-attach stream.
+        let reBuf = "";
+        const onStdout = (data: Buffer) => {
+          reBuf += data.toString();
+          const lines = reBuf.split("\n");
+          reBuf = lines.pop() ?? "";
+          for (const line of lines) {
+            try {
+              const events = reattachParser(line + "\n");
+              for (const event of events) {
+                if (event.type === "content" || event.type.startsWith("tool_")) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+                }
+              }
+            } catch {
+              // Controller closed
+            }
+            if (isPersistent) {
+              const t = line.trim();
+              if (t) {
+                try {
+                  const j = JSON.parse(t);
+                  if (j.type === "result") finish(j.is_error === true ? "error" : "complete");
+                } catch { /* not JSON */ }
+              }
+            }
+          }
+        };
+        const onClose = (code: number | null) => finish(code === 0 ? "complete" : "error");
+
+        existing.process.stdout?.on("data", onStdout);
+        existing.process.on("close", onClose);
       },
     });
 
@@ -182,15 +212,7 @@ export async function POST(
       const cwd = workspaceDir;
 
       try {
-        pm.spawn(
-          threadId,
-          agent.id,
-          agentModel,
-          effectiveCliModel,
-          enrichedPrompt,
-          cwd,
-          // onData
-          (chunk: string) => {
+        const handleData = (chunk: string) => {
             const events = parser(chunk);
             for (const event of events) {
               if (event.type === "content") {
@@ -311,9 +333,8 @@ export async function POST(
                 ...(accumulatedBlocks.length > 0 ? { contentBlocks: accumulatedBlocks } : {}),
               }).catch(() => {});
             }
-          },
-          // onClose
-          (code) => {
+        };
+        const handleClose = (code: number | null) => {
             const status = code === 0 ? "complete" : "error";
             if (clientDisconnected && status === "complete") {
               addUnreadAgent(workspaceDir, threadId, agentId).catch(() => {});
@@ -377,9 +398,8 @@ export async function POST(
             } catch {
               // Already closed
             }
-          },
-          // onError
-          (err: Error) => {
+        };
+        const handleError = (err: Error) => {
             const errorContent = accumulatedContent
               ? `${accumulatedContent}\n\n[Error: ${err.message}]`
               : `[Error: ${err.message}]`;
@@ -394,15 +414,51 @@ export async function POST(
             } catch {
               // Already closed
             }
-          },
-          hasHistory,
-          effectivePersonality,
-          imagePaths.length > 0 ? imagePaths : undefined,
-          fullHistoryPrompt,
-          permissionLevel,
-          threadPaths.length > 0 ? threadPaths : undefined,
-          mcpConfigPath
-        );
+        };
+
+        const imagePathsArg = imagePaths.length > 0 ? imagePaths : undefined;
+        const threadPathsArg = threadPaths.length > 0 ? threadPaths : undefined;
+
+        if (agentModel === "claude") {
+          // Persistent Claude session: prompt travels via stdin (no argv length
+          // limit) and the process stays alive so follow-up turns queue onto it.
+          pm.startClaudeTurn(
+            threadId,
+            agent.id,
+            effectiveCliModel,
+            enrichedPrompt,
+            cwd,
+            handleData,
+            (status) => handleClose(status === "complete" ? 0 : 1),
+            handleError,
+            hasHistory,
+            effectivePersonality,
+            imagePathsArg,
+            fullHistoryPrompt,
+            permissionLevel,
+            threadPathsArg,
+            mcpConfigPath
+          );
+        } else {
+          pm.spawn(
+            threadId,
+            agent.id,
+            agentModel,
+            effectiveCliModel,
+            enrichedPrompt,
+            cwd,
+            handleData,
+            handleClose,
+            handleError,
+            hasHistory,
+            effectivePersonality,
+            imagePathsArg,
+            fullHistoryPrompt,
+            permissionLevel,
+            threadPathsArg,
+            mcpConfigPath
+          );
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         updateMessage(workspaceDir, threadId, assistantMsg.id, {

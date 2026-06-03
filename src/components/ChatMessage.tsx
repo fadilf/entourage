@@ -14,6 +14,7 @@ import ToolCallBlock from "./ToolCallBlock";
 import ToolCallGroup from "./ToolCallGroup";
 import McpAppBlock from "./McpAppBlock";
 import PermissionDenialBanner from "./PermissionDenialBanner";
+import { useSpeakingMessageId } from "@/lib/tts";
 
 function renderMentions(content: string) {
   const parts = content.split(/(@\w+)/g);
@@ -258,9 +259,14 @@ export default memo(function ChatMessage({
     }
   }, []);
 
+  const speakingMessageId = useSpeakingMessageId();
+  const isSpeaking = speakingMessageId === message.id;
+
   return (
     <div
-      className="group relative py-0.5 px-1 -mx-1 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800"
+      className={`group relative py-0.5 px-1 -mx-1 rounded hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
+        isSpeaking ? "ring-1 ring-violet-400/60 dark:ring-violet-500/60" : ""
+      }`}
       onContextMenu={(e) => {
         if (!onContextMenu) return;
         e.preventDefault();

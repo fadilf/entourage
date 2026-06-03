@@ -139,6 +139,8 @@ export default function MessageInput({
   onSendMessage,
   onStop,
   disabled,
+  streaming = false,
+  allowQueue = false,
   isMobile,
   onDraftChange,
   showTopBorder = true,
@@ -153,6 +155,10 @@ export default function MessageInput({
   onSendMessage: (content: string, images?: MessageImage[], attachedThreads?: { id: string; title: string }[]) => void;
   onStop?: (agentId: string) => void;
   disabled?: boolean;
+  /** An agent is currently streaming in this thread (show the Stop control). */
+  streaming?: boolean;
+  /** Allow sending a follow-up while streaming (queued behind the current turn). */
+  allowQueue?: boolean;
   isMobile?: boolean;
   onDraftChange?: (hasText: boolean) => void;
   showTopBorder?: boolean;
@@ -681,7 +687,11 @@ export default function MessageInput({
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder={`Message ${agents.map((a) => a.name).join(", ")}... (@ to mention)`}
+            placeholder={
+              allowQueue
+                ? "Queue a follow-up — sends after the current reply…"
+                : `Message ${agents.map((a) => a.name).join(", ")}... (@ to mention)`
+            }
             disabled={disabled}
             rows={1}
             className={`w-full resize-none rounded-lg border bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none disabled:opacity-50 ${
@@ -723,13 +733,25 @@ export default function MessageInput({
           )}
         </div>
 
-        {disabled && onStop ? (
-          <button
-            onClick={() => agents.forEach((a) => onStop(a.id))}
-            className="shrink-0 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
-          >
-            Stop
-          </button>
+        {streaming && onStop ? (
+          <div className="flex shrink-0 items-center gap-2">
+            {allowQueue && (
+              <button
+                onClick={handleSend}
+                disabled={!canSend}
+                className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-sm font-medium text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50"
+                title="Queue this message — it will send after the current reply"
+              >
+                {uploading ? "Uploading..." : "Send"}
+              </button>
+            )}
+            <button
+              onClick={() => agents.forEach((a) => onStop(a.id))}
+              className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
+            >
+              Stop
+            </button>
+          </div>
         ) : (
           <button
             onClick={handleSend}

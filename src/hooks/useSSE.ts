@@ -23,6 +23,11 @@ export function useAgentStream(
     new Map()
   );
   const abortControllers = useRef<Map<string, AbortController>>(new Map());
+  // Serializes streams per (threadId, agentId): a follow-up message sent while
+  // an agent is still streaming is chained to run after the current turn, so the
+  // two turns never share the single per-agent streaming display slot. This
+  // mirrors how the CLI queues messages typed while it's working.
+  const agentChains = useRef<Map<string, Promise<void>>>(new Map());
   const autoDispatchCounters = useRef<Map<string, number>>(new Map());
   const [autoDispatchPaused, setAutoDispatchPaused] = useState(false);
   const [, setRenderTick] = useState(0);
@@ -260,7 +265,7 @@ export function useAgentStream(
 
   // --- Public API ---
 
-  const streamAgent = useCallback(
+  const runStream = useCallback(
     async (
       targetThreadId: string,
       agentId: string,
@@ -311,6 +316,28 @@ export function useAgentStream(
       }
     },
     [triggerRender, wsParam, consumeStream, cleanupStream]
+  );
+
+  // Public entry point: serialize per-agent so a message sent while the agent is
+  // still streaming runs after the current turn completes (matching the CLI's
+  // queue behavior) instead of clobbering the single per-agent display slot.
+  const streamAgent = useCallback(
+    (
+      targetThreadId: string,
+      agentId: string,
+      prompt: string,
+      images?: MessageImage[],
+      attachedThreadIds?: string[]
+    ): Promise<void> => {
+      const key = `${targetThreadId}:${agentId}`;
+      const prev = agentChains.current.get(key) ?? Promise.resolve();
+      const run = prev
+        .catch(() => {})
+        .then(() => runStream(targetThreadId, agentId, prompt, images, attachedThreadIds));
+      agentChains.current.set(key, run.catch(() => {}));
+      return run;
+    },
+    [runStream]
   );
 
   streamAgentRef.current = streamAgent;

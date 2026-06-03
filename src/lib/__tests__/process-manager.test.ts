@@ -212,6 +212,7 @@ describe("ProcessManager", () => {
         undefined,
         undefined,
         "full",
+        undefined,
         undefined
       );
 

@@ -82,11 +82,13 @@ export function writeMcpConfigFile(servers: McpServerConfig[]): string | undefin
   return configPath;
 }
 
-export function getCliCommand(model: AgentModel, prompt: string, sessionId: string, isResume: boolean, personality?: string, cliModel?: string, imagePaths?: string[], permissionLevel: PermissionLevel = "full", threadPaths?: string[], mcpConfigPath?: string): { cmd: string; args: string[] } {
+/**
+ * Enrich a prompt with image and reference-thread instructions.
+ * Shared by argv-based spawns (getCliCommand) and the Claude stream-json
+ * stdin path, so both produce identical prompt text.
+ */
+export function enrichPromptWithAttachments(prompt: string, imagePaths?: string[], threadPaths?: string[]): string {
   const hasImages = imagePaths && imagePaths.length > 0;
-  const effectiveCliModel = resolveCliModel(model, cliModel);
-
-  // Build prompt with image instructions
   let fullPrompt = prompt;
   if (hasImages) {
     const imageList = imagePaths.map((p) => p).join("\n");
@@ -94,8 +96,6 @@ export function getCliCommand(model: AgentModel, prompt: string, sessionId: stri
   }
 
   const hasThreads = threadPaths && threadPaths.length > 0;
-
-  // Add thread reference instructions
   if (hasThreads) {
     const threadList = threadPaths.map((p) => `- ${p}`).join("\n");
     const threadInstruction = `IMPORTANT: The user has attached reference conversation thread(s) for additional context.\nYou may read these JSON files to understand prior conversations, but you MUST NOT modify, delete, or write to them.\nReference thread files:\n${threadList}`;
@@ -109,6 +109,65 @@ export function getCliCommand(model: AgentModel, prompt: string, sessionId: stri
       fullPrompt = `${threadInstruction}\n\nUser message: ${prompt}`;
     }
   }
+  return fullPrompt;
+}
+
+/**
+ * Build argv for a persistent Claude session that reads user messages from
+ * stdin as newline-delimited JSON (--input-format stream-json). The prompt is
+ * NOT passed on the command line, which avoids Windows' argv length limit
+ * (spawn ENAMETOOLONG) for large prompts / full-history fallbacks.
+ *
+ * The process stays alive across turns; each user message written to stdin
+ * produces exactly one `result` event (see process-manager turn handling).
+ */
+export function getClaudeStreamArgs(
+  sessionId: string,
+  isResume: boolean,
+  personality?: string,
+  cliModel?: string,
+  permissionLevel: PermissionLevel = "full",
+  mcpConfigPath?: string
+): string[] {
+  const args = [
+    "--print",
+    "--input-format", "stream-json",
+    "--output-format", "stream-json",
+    "--verbose",
+    "--include-partial-messages",
+  ];
+  const isRoot = process.getuid?.() === 0;
+  if (!isRoot) {
+    if (permissionLevel === "full") {
+      args.push("--dangerously-skip-permissions");
+    } else if (permissionLevel === "auto-edit") {
+      args.push("--permission-mode", "acceptEdits");
+    }
+    // "supervised" — no flag, uses CLI default permission mode
+  }
+  if (isResume) {
+    args.push("--resume", sessionId);
+  } else {
+    args.push("--session-id", sessionId);
+  }
+  if (personality) {
+    args.push("--append-system-prompt", personality);
+  }
+  if (cliModel) {
+    args.push("--model", cliModel);
+  }
+  if (mcpConfigPath) {
+    args.push("--mcp-config", mcpConfigPath);
+  }
+  return args;
+}
+
+export function getCliCommand(model: AgentModel, prompt: string, sessionId: string, isResume: boolean, personality?: string, cliModel?: string, imagePaths?: string[], permissionLevel: PermissionLevel = "full", threadPaths?: string[], mcpConfigPath?: string): { cmd: string; args: string[] } {
+  const hasImages = imagePaths && imagePaths.length > 0;
+  const effectiveCliModel = resolveCliModel(model, cliModel);
+
+  // Build prompt with image / reference-thread instructions
+  const fullPrompt = enrichPromptWithAttachments(prompt, imagePaths, threadPaths);
 
   if (model === "claude") {
     const args = ["-p", fullPrompt, "--output-format", "stream-json", "--verbose", "--include-partial-messages"];

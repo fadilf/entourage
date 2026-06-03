@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ThreadWithMessages, Agent, Message, MessageImage, Icon, PermissionLevel, ThreadListItem } from "@/lib/types";
-import { ChevronLeft, Copy, Pencil, RotateCcw, Send, ShieldCheck, ShieldAlert, Shield, RefreshCw, Repeat } from "lucide-react";
+import { ChevronLeft, Copy, Pencil, RotateCcw, Send, ShieldCheck, ShieldAlert, Shield, RefreshCw, Repeat, Volume2, VolumeX } from "lucide-react";
 import Dialog from "./Dialog";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import QuickReplies from "./QuickReplies";
 import ContextMenu from "./ContextMenu";
+import { speak, stop as stopTts, useSpeakingMessageId, stripMarkdownForSpeech, isTtsSupported } from "@/lib/tts";
 
 export default function ThreadDetail({
   thread,
@@ -104,6 +105,12 @@ export default function ThreadDetail({
     setContextMenu({ x, y, message });
   }, []);
 
+  const speakingMessageId = useSpeakingMessageId();
+
+  useEffect(() => {
+    return () => stopTts();
+  }, []);
+
   // Build streaming messages as Message objects for display
   const allMessages = useMemo(() => {
     if (!thread) return [];
@@ -142,6 +149,17 @@ export default function ThreadDetail({
   }
 
   const hasQuickReplies = (suggestions?.length ?? 0) > 0;
+
+  // A follow-up can be queued while streaming only when every currently-streaming
+  // agent is Claude (its persistent session accepts queued turns). For other
+  // models the input stays disabled while running, as before.
+  const streamingAgentIds = Array.from(streamingMessages.keys());
+  const onlyClaudeStreaming =
+    isStreaming &&
+    streamingAgentIds.length > 0 &&
+    streamingAgentIds.every(
+      (id) => thread.agents.find((a) => a.id === id)?.model === "claude"
+    );
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -377,7 +395,9 @@ export default function ThreadDetail({
           allAgents={allAgents}
           onSendMessage={onSendMessage}
           onStop={onStop}
-          disabled={isStreaming}
+          disabled={isStreaming && !onlyClaudeStreaming}
+          streaming={isStreaming}
+          allowQueue={onlyClaudeStreaming}
           isMobile={isMobile}
           onDraftChange={onDraftChange}
           showTopBorder={false}
@@ -410,6 +430,31 @@ export default function ThreadDetail({
                 });
               },
             },
+            ...(isTtsSupported()
+              ? [
+                  speakingMessageId === contextMenu.message.id
+                    ? {
+                        label: "Stop reading",
+                        icon: <VolumeX className="h-4 w-4" />,
+                        onClick: () => stopTts(),
+                      }
+                    : {
+                        label: "Read aloud",
+                        icon: <Volume2 className="h-4 w-4" />,
+                        onClick: () => {
+                          const text = stripMarkdownForSpeech(contextMenu.message.content);
+                          speak(contextMenu.message.id, text);
+                        },
+                        disabled:
+                          contextMenu.message.status === "streaming" ||
+                          !stripMarkdownForSpeech(contextMenu.message.content).trim(),
+                        disabledReason:
+                          contextMenu.message.status === "streaming"
+                            ? "Wait for the message to finish"
+                            : "Nothing to read",
+                      },
+                ]
+              : []),
             ...(contextMenu.message.role === "user"
               ? [
                   {
