@@ -99,7 +99,7 @@ describe("agent-store logic", () => {
     it("keeps agents with valid models", () => {
       const agents = [
         { id: "1", name: "A", model: "claude" },
-        { id: "2", name: "B", model: "gemini" },
+        { id: "2", name: "B", model: "codex" },
       ];
       expect(agents.filter(hasSupportedModel)).toHaveLength(2);
     });

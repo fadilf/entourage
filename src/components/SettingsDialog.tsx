@@ -21,7 +21,6 @@ import {
 
 const EMPTY_DEFAULT_CLI_MODELS: Record<AgentModel, string> = {
   claude: "",
-  gemini: "",
   codex: "",
 };
 
@@ -30,7 +29,6 @@ function normalizeDefaultCliModels(
 ): Record<AgentModel, string> {
   return {
     claude: value?.claude ?? "",
-    gemini: value?.gemini ?? "",
     codex: value?.codex ?? "",
   };
 }

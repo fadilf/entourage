@@ -25,7 +25,7 @@ type ProcessEntry = {
   stderrBuffer: string[]; // Stderr output (not shown as content)
   accumulatedContent: string; // Full parsed content for re-attachment
   accumulatedBlocks: import("./types").ContentBlock[]; // Full content blocks for re-attachment
-  // --- Persistent Claude session fields (undefined for one-shot codex/gemini spawns) ---
+  // --- Persistent Claude session fields (undefined for one-shot codex spawns) ---
   persistent?: boolean;
   sessionId?: string; // Session id this process was spawned with
   isResume?: boolean; // Whether this process was spawned with --resume
@@ -69,7 +69,7 @@ function summarizeStderr(stderr: string): string {
  * Check if a parsed JSON line indicates a resume failure.
  */
 function isResumeError(json: Record<string, unknown>, model: AgentModel): boolean {
-  // Claude/Gemini: result event with error flag
+  // Claude: result event with error flag
   if (json.type === "result" && json.is_error === true) return true;
   // Codex: turn.failed or stream-level error
   if (model === "codex" && (json.type === "turn.failed" || json.type === "error")) return true;
@@ -85,7 +85,7 @@ function hasSuccessSignal(json: Record<string, unknown>, model: AgentModel): boo
     const t = json.type as string;
     return t === "item.started" || t === "item.updated" || t === "item.completed" || t === "turn.started";
   }
-  // Claude/Gemini: anything that's not a "result" event
+  // Claude: anything that's not a "result" event
   return json.type !== "result";
 }
 
@@ -172,13 +172,17 @@ class ProcessManager {
     // After rewind, use full history prompt so the fresh session has full context
     const effectivePrompt = (!isResume && wasRewound && fullHistoryPrompt) ? fullHistoryPrompt : prompt;
 
-    const { cmd, args } = getCliCommand(model, effectivePrompt, sessionId, isResume, personality, cliModel, imagePaths, permissionLevel, threadPaths, mcpConfigPath);
+    const { cmd, args, stdin } = getCliCommand(model, effectivePrompt, sessionId, isResume, personality, cliModel, imagePaths, permissionLevel, threadPaths, mcpConfigPath);
 
     const child = cpSpawn(cmd, args, {
       cwd,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [stdin !== undefined ? "pipe" : "ignore", "pipe", "pipe"],
       env: { ...process.env },
     });
+    if (stdin !== undefined) {
+      // Prompt travels via stdin (codex `-`), bypassing the argv length limit.
+      try { child.stdin?.write(stdin); child.stdin?.end(); } catch { /* stdin closed */ }
+    }
 
     const entry: ProcessEntry = {
       process: child,
@@ -279,9 +283,12 @@ class ProcessManager {
           const fresh = getCliCommand(model, retryPrompt, sessionId, false, personality, cliModel, imagePaths, permissionLevel, threadPaths, mcpConfigPath);
           const retryChild = cpSpawn(fresh.cmd, fresh.args, {
             cwd,
-            stdio: ["ignore", "pipe", "pipe"],
+            stdio: [fresh.stdin !== undefined ? "pipe" : "ignore", "pipe", "pipe"],
             env: { ...process.env },
           });
+          if (fresh.stdin !== undefined) {
+            try { retryChild.stdin?.write(fresh.stdin); retryChild.stdin?.end(); } catch { /* stdin closed */ }
+          }
           const retryEntry: ProcessEntry = {
             process: retryChild,
             threadId,

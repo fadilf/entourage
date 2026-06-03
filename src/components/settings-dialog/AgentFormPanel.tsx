@@ -70,13 +70,11 @@ Produce structured output with sections. Be exhaustive but concise — facts ove
 
 const MODEL_PLACEHOLDERS: Record<AgentFormData["model"], string> = {
   claude: "Optional, e.g. sonnet or claude-sonnet-4-6",
-  gemini: "Optional, e.g. gemini-2.5-pro",
   codex: "Optional, e.g. gpt-5.4",
 };
 
 const MODEL_HINTS: Record<AgentFormData["model"], string> = {
   claude: "Leave blank to use the app default for Claude, or Claude Code's own default if none is set.",
-  gemini: "Leave blank to use the app default for Gemini, or Gemini CLI's own default if none is set.",
   codex: "Leave blank to use the app default for Codex.",
 };
 
@@ -123,7 +121,7 @@ export default function AgentFormPanel({
       <div>
         <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Model</label>
         <div className="mt-1 flex gap-1">
-          {(["claude", "gemini", "codex"] as const).map((model) => (
+          {(["claude", "codex"] as const).map((model) => (
             <button
               key={model}
               type="button"

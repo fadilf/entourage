@@ -49,8 +49,8 @@ describe("createStreamParser", () => {
       expect(events).toEqual([{ type: "content", text: "plain text output" }]);
     });
 
-    it("ignores non-JSON lines for Gemini", () => {
-      const events = parse("gemini", ["diagnostic noise"]);
+    it("ignores non-JSON lines for Codex", () => {
+      const events = parse("codex", ["diagnostic noise"]);
       expect(events).toEqual([]);
     });
 
@@ -78,37 +78,6 @@ describe("createStreamParser", () => {
           denials: [{ toolName: "Bash", toolInput: { command: "rm -rf /" } }],
         },
       ]);
-    });
-  });
-
-  describe("Gemini", () => {
-    it("extracts text content", () => {
-      const events = parse("gemini", [JSON.stringify({ text: "Hello from Gemini" })]);
-      expect(events).toEqual([{ type: "content", text: "Hello from Gemini" }]);
-    });
-
-    it("extracts tool events", () => {
-      const events = parse("gemini", [
-        JSON.stringify({
-          type: "tool_use",
-          tool_id: "t1",
-          tool_name: "read_file",
-          parameters: { path: "/foo" },
-        }),
-        JSON.stringify({ type: "tool_result", tool_id: "t1", output: "contents" }),
-      ]);
-      expect(events).toEqual([
-        { type: "tool_start", toolId: "t1", toolName: "read_file", input: '{"path":"/foo"}' },
-        { type: "tool_result", toolId: "t1", output: "contents" },
-      ]);
-    });
-
-    it("skips init and user messages", () => {
-      const events = parse("gemini", [
-        JSON.stringify({ type: "init" }),
-        JSON.stringify({ role: "user", content: "echo" }),
-      ]);
-      expect(events).toEqual([]);
     });
   });
 

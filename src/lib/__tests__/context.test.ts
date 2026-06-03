@@ -4,7 +4,7 @@ import { Message, Agent } from "../types";
 
 const agents: Agent[] = [
   { id: "a1", name: "Claude", model: "claude", avatarColor: "#000" },
-  { id: "a2", name: "Gemini", model: "gemini", avatarColor: "#000" },
+  { id: "a2", name: "Gemini", model: "codex", avatarColor: "#000" },
 ];
 
 function msg(overrides: Partial<Message> & Pick<Message, "role" | "content">): Message {

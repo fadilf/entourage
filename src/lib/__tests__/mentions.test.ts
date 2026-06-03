@@ -4,7 +4,7 @@ import { Agent } from "../types";
 
 const agents: Agent[] = [
   { id: "1", name: "Claude", model: "claude", avatarColor: "#7c3aed" },
-  { id: "2", name: "Gemini", model: "gemini", avatarColor: "#2563eb" },
+  { id: "2", name: "Codex", model: "codex", avatarColor: "#2563eb" },
 ];
 
 describe("parseMentions", () => {
@@ -14,7 +14,7 @@ describe("parseMentions", () => {
   });
 
   it("extracts multiple mentions", () => {
-    const result = parseMentions("@claude and @gemini review this", agents);
+    const result = parseMentions("@claude and @codex review this", agents);
     expect(result).toEqual([agents[0], agents[1]]);
   });
 

@@ -8,7 +8,7 @@ describe("getCliCommand", () => {
     });
 
     it("falls back to configured app defaults", () => {
-      expect(resolveCliModel("gemini", undefined, { gemini: "gemini-2.5-pro" })).toBe("gemini-2.5-pro");
+      expect(resolveCliModel("codex", undefined, { codex: "gpt-5.5" })).toBe("gpt-5.5");
     });
 
     it("falls back to built-in defaults when no configured default exists", () => {
@@ -64,49 +64,17 @@ describe("getCliCommand", () => {
     });
   });
 
-  describe("gemini", () => {
-    it("produces base gemini command", () => {
-      const { cmd, args } = getCliCommand("gemini", "hello", "s1", false);
-      expect(cmd).toBe("gemini");
-      expect(args).toContain("-p");
-      expect(args).toContain("--output-format");
-      expect(args).toContain("stream-json");
-    });
-
-    it("adds --yolo for full permission", () => {
-      const { args } = getCliCommand("gemini", "hi", "s1", false, undefined, undefined, undefined, "full");
-      expect(args).toContain("--yolo");
-    });
-
-    it("adds --approval-mode auto_edit for auto-edit", () => {
-      const { args } = getCliCommand("gemini", "hi", "s1", false, undefined, undefined, undefined, "auto-edit");
-      expect(args).toContain("--approval-mode");
-      expect(args).toContain("auto_edit");
-    });
-
-    it("prepends personality as system instructions in prompt", () => {
-      const { args } = getCliCommand("gemini", "hello", "s1", false, "be helpful");
-      const promptIdx = args.indexOf("-p") + 1;
-      expect(args[promptIdx]).toContain("[System Instructions]");
-      expect(args[promptIdx]).toContain("be helpful");
-      expect(args[promptIdx]).toContain("hello");
-    });
-
-    it("passes through an explicit Gemini model", () => {
-      const { args } = getCliCommand("gemini", "hello", "s1", false, undefined, "gemini-2.5-pro");
-      expect(args).toContain("--model");
-      expect(args).toContain("gemini-2.5-pro");
-    });
-  });
-
   describe("codex", () => {
     it("produces base codex command", () => {
-      const { cmd, args } = getCliCommand("codex", "hello", "s1", false);
+      const { cmd, args, stdin } = getCliCommand("codex", "hello", "s1", false);
       expect(cmd).toBe("codex");
       expect(args).toContain("exec");
       expect(args).toContain("--json");
       expect(args).toContain("--model");
       expect(args).toContain(DEFAULT_CLI_MODELS.codex);
+      // Prompt is sent via stdin (`-`), not as an argv arg, to avoid ENAMETOOLONG.
+      expect(args[args.length - 1]).toBe("-");
+      expect(stdin).toBe("hello");
     });
 
     it("uses exec resume for resumed sessions", () => {
@@ -129,12 +97,11 @@ describe("getCliCommand", () => {
       expect(args).toContain("workspace-write");
     });
 
-    it("prepends personality in prompt", () => {
-      const { args } = getCliCommand("codex", "hello", "s1", false, "be terse");
-      const prompt = args[args.length - 1];
-      expect(prompt).toContain("[System Instructions]");
-      expect(prompt).toContain("be terse");
-      expect(prompt).toContain("hello");
+    it("prepends personality in the stdin prompt", () => {
+      const { stdin } = getCliCommand("codex", "hello", "s1", false, "be terse");
+      expect(stdin).toContain("[System Instructions]");
+      expect(stdin).toContain("be terse");
+      expect(stdin).toContain("hello");
     });
 
     it("adds --image= flags for images", () => {

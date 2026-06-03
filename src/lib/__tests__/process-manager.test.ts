@@ -274,7 +274,7 @@ describe("ProcessManager", () => {
 
       const pm = getProcessManager();
       pm.spawn("t1", "a1", "claude", undefined, "hello", "/tmp", vi.fn(), vi.fn(), vi.fn());
-      pm.spawn("t1", "a2", "gemini", undefined, "hello", "/tmp", vi.fn(), vi.fn(), vi.fn());
+      pm.spawn("t1", "a2", "codex", undefined, "hello", "/tmp", vi.fn(), vi.fn(), vi.fn());
       pm.spawn("t2", "a1", "claude", undefined, "hello", "/tmp", vi.fn(), vi.fn(), vi.fn());
 
       pm.killByThread("t1");
@@ -350,7 +350,7 @@ describe("ProcessManager", () => {
 
       const pm = getProcessManager();
       pm.spawn("t1", "a1", "claude", undefined, "hello", "/tmp", vi.fn(), vi.fn(), vi.fn());
-      pm.spawn("t2", "a2", "gemini", undefined, "hello", "/tmp", vi.fn(), vi.fn(), vi.fn());
+      pm.spawn("t2", "a2", "codex", undefined, "hello", "/tmp", vi.fn(), vi.fn(), vi.fn());
 
       const statuses = pm.getAllStatuses();
       expect(statuses).toHaveLength(2);
@@ -410,7 +410,7 @@ describe("ProcessManager", () => {
 
       const pm = getProcessManager();
       pm.spawn("t1", "a1", "claude", undefined, "hello", "/tmp", vi.fn(), vi.fn(), vi.fn());
-      pm.spawn("t2", "a2", "gemini", undefined, "hello", "/tmp", vi.fn(), vi.fn(), vi.fn());
+      pm.spawn("t2", "a2", "codex", undefined, "hello", "/tmp", vi.fn(), vi.fn(), vi.fn());
 
       pm.killAll();
 

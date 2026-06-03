@@ -14,7 +14,7 @@ export function getUploadsDir(workspaceDir?: string): string {
   return path.join(workspaceDir || process.cwd(), ENTOURAGE_DIR, UPLOADS_DIR);
 }
 
-export const DEFAULT_AGENT_IDS = ["claude", "gemini", "codex"];
+export const DEFAULT_AGENT_IDS = ["claude", "codex"];
 
 export const DEFAULT_AGENTS: Agent[] = [
   {
@@ -22,13 +22,6 @@ export const DEFAULT_AGENTS: Agent[] = [
     name: "Claude",
     model: "claude",
     avatarColor: "#d97706",
-    isDefault: true,
-  },
-  {
-    id: "gemini",
-    name: "Gemini",
-    model: "gemini",
-    avatarColor: "#3b82f6",
     isDefault: true,
   },
   {
@@ -162,7 +155,7 @@ export function getClaudeStreamArgs(
   return args;
 }
 
-export function getCliCommand(model: AgentModel, prompt: string, sessionId: string, isResume: boolean, personality?: string, cliModel?: string, imagePaths?: string[], permissionLevel: PermissionLevel = "full", threadPaths?: string[], mcpConfigPath?: string): { cmd: string; args: string[] } {
+export function getCliCommand(model: AgentModel, prompt: string, sessionId: string, isResume: boolean, personality?: string, cliModel?: string, imagePaths?: string[], permissionLevel: PermissionLevel = "full", threadPaths?: string[], mcpConfigPath?: string): { cmd: string; args: string[]; stdin?: string } {
   const hasImages = imagePaths && imagePaths.length > 0;
   const effectiveCliModel = resolveCliModel(model, cliModel);
 
@@ -232,27 +225,13 @@ export function getCliCommand(model: AgentModel, prompt: string, sessionId: stri
     if (effectiveCliModel) {
       args.push("--model", effectiveCliModel);
     }
-    args.push(effectivePrompt);
+    // Pass the prompt via stdin (`-`) instead of as the final argv arg, so large
+    // prompts / full-history fallbacks never hit the OS command-line length limit
+    // (fixes spawn ENAMETOOLONG). `codex exec [resume <id>] -` reads from stdin.
+    args.push("-");
 
-    return { cmd: "codex", args };
+    return { cmd: "codex", args, stdin: effectivePrompt };
   }
 
-  // Gemini: no --system-instruction flag, prepend to prompt
-  let effectivePrompt = fullPrompt;
-  if (personality) {
-    effectivePrompt = `[System Instructions]\n${personality}\n[End System Instructions]\n\n${fullPrompt}`;
-  }
-
-  const geminiArgs = ["-p", effectivePrompt, "--output-format", "stream-json"];
-  if (effectiveCliModel) {
-    geminiArgs.push("--model", effectiveCliModel);
-  }
-  if (permissionLevel === "full") {
-    geminiArgs.push("--yolo");
-  } else if (permissionLevel === "auto-edit") {
-    geminiArgs.push("--approval-mode", "auto_edit");
-  }
-  // "supervised" — no flag, uses CLI default (dangerous tools excluded)
-
-  return { cmd: "gemini", args: geminiArgs };
+  throw new Error(`Unsupported agent model: ${model}`);
 }

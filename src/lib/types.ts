@@ -1,4 +1,4 @@
-export const AGENT_MODELS = ["claude", "gemini", "codex"] as const;
+export const AGENT_MODELS = ["claude", "codex"] as const;
 
 export type AgentModel = (typeof AGENT_MODELS)[number];
 

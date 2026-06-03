@@ -12,7 +12,6 @@ const DEFAULT_MODEL_FIELDS: ReadonlyArray<{
   placeholder: string;
 }> = [
   { model: "claude", label: "Claude", placeholder: "e.g. sonnet or claude-sonnet-4-6" },
-  { model: "gemini", label: "Gemini", placeholder: "e.g. gemini-2.5-pro" },
   { model: "codex", label: "Codex", placeholder: "e.g. gpt-5.4" },
 ];
 

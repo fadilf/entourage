@@ -1,7 +1,7 @@
 import { Agent } from "./types";
 
 /**
- * Replace @mentions with just the agent name (e.g. "@gemini" → "gemini").
+ * Replace @mentions with just the agent name (e.g. "@codex" → "codex").
  * Mentions are routing metadata, not content for the model.
  */
 export function stripMentions(content: string, agents: Agent[]): string {
