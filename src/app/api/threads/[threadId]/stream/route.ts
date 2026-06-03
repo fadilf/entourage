@@ -523,7 +523,8 @@ export async function POST(
             imagePathsArg,
             fullHistoryPrompt,
             permissionLevel,
-            threadPathsArg
+            threadPathsArg,
+            mcpServers
           );
         }
       } catch (err) {

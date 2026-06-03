@@ -2,11 +2,12 @@ import { readFileSync } from "fs";
 import path from "path";
 import type {
   ContentBlock,
+  McpServer,
   PermissionOption,
   SessionNotification,
   ToolCallContent,
 } from "@agentclientprotocol/sdk";
-import { PermissionLevel } from "./types";
+import { PermissionLevel, McpServerConfig } from "./types";
 import { StreamEvent } from "./stream-parser";
 import { enrichPromptWithAttachments } from "./config";
 
@@ -53,6 +54,28 @@ export function translateAcpUpdate(update: AcpUpdate): StreamEvent[] {
     default:
       return [];
   }
+}
+
+/**
+ * Map the app's MCP server configs to ACP `McpServer` entries for `session/new`,
+ * so Codex gets the same MCP tools configured for the workspace. stdio servers
+ * become the default (typeless) variant; sse servers map to the `sse` transport.
+ */
+export function toAcpMcpServers(servers: McpServerConfig[]): McpServer[] {
+  const out: McpServer[] = [];
+  for (const s of servers) {
+    if (s.transport === "stdio" && s.command) {
+      out.push({
+        name: s.name,
+        command: s.command,
+        args: s.args ?? [],
+        env: Object.entries(s.env ?? {}).map(([name, value]) => ({ name, value })),
+      });
+    } else if (s.transport === "sse" && s.url) {
+      out.push({ type: "sse", name: s.name, url: s.url, headers: [] });
+    }
+  }
+  return out;
 }
 
 /** Flatten ACP tool-call content blocks into a plain-text output summary. */

@@ -7,8 +7,9 @@ import type {
   PermissionOption,
   SessionNotification,
 } from "@agentclientprotocol/sdk";
-import { PermissionLevel } from "./types";
+import { PermissionLevel, McpServerConfig } from "./types";
 import { getCodexAcpConfigArgs } from "./config";
+import { toAcpMcpServers } from "./acp-codex";
 
 // Current ACP protocol version (the SDK no longer exports a constant). The
 // agent negotiates and echoes the supported version in the initialize response.
@@ -45,6 +46,7 @@ export type AcpConnectionOptions = {
   cwd: string;
   cliModel?: string;
   permissionLevel: PermissionLevel;
+  mcpServers?: McpServerConfig[];
 };
 
 /**
@@ -137,7 +139,10 @@ export class AcpConnection {
   /** Create a fresh session and return its id. */
   async newSession(): Promise<string> {
     if (!this.conn) throw new Error("ACP connection not established");
-    const res = await this.conn.newSession({ cwd: this.opts.cwd, mcpServers: [] });
+    const res = await this.conn.newSession({
+      cwd: this.opts.cwd,
+      mcpServers: this.opts.mcpServers ? toAcpMcpServers(this.opts.mcpServers) : [],
+    });
     return res.sessionId;
   }
 

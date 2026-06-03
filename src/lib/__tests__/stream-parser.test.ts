@@ -81,27 +81,6 @@ describe("createStreamParser", () => {
     });
   });
 
-  describe("Codex", () => {
-    it("extracts incremental text from agent_message items", () => {
-      const parser = createStreamParser("codex");
-      const e1 = parser(JSON.stringify({ type: "item.updated", item: { type: "agent_message", id: "m1", text: "Hel" } }) + "\n");
-      const e2 = parser(JSON.stringify({ type: "item.updated", item: { type: "agent_message", id: "m1", text: "Hello" } }) + "\n");
-      expect(e1).toEqual([{ type: "content", text: "Hel" }]);
-      expect(e2).toEqual([{ type: "content", text: "lo" }]);
-    });
-
-    it("extracts command execution events", () => {
-      const events = parse("codex", [
-        JSON.stringify({ type: "item.started", item: { type: "command_execution", id: "c1", command: "ls" } }),
-        JSON.stringify({ type: "item.completed", item: { type: "command_execution", id: "c1", aggregated_output: "file.txt" } }),
-      ]);
-      expect(events).toEqual([
-        { type: "tool_start", toolId: "c1", toolName: "shell", input: "ls" },
-        { type: "tool_result", toolId: "c1", output: "file.txt" },
-      ]);
-    });
-  });
-
   describe("buffering", () => {
     it("handles split chunks across calls", () => {
       const parser = createStreamParser("claude");

@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { writeFileSync, mkdtempSync } from "fs";
 import os from "os";
 import path from "path";
-import { translateAcpUpdate, buildCodexAcpPrompt, decideCodexPermission } from "../acp-codex";
+import { translateAcpUpdate, buildCodexAcpPrompt, decideCodexPermission, toAcpMcpServers } from "../acp-codex";
+import { McpServerConfig } from "../types";
 
 describe("translateAcpUpdate", () => {
   it("maps agent_message_chunk text to a content event", () => {
@@ -107,6 +108,37 @@ describe("buildCodexAcpPrompt", () => {
   it("skips unreadable images rather than throwing", () => {
     const blocks = buildCodexAcpPrompt("look", undefined, ["/does/not/exist.png"]);
     expect(blocks).toEqual([{ type: "text", text: "look" }]);
+  });
+});
+
+describe("toAcpMcpServers", () => {
+  it("maps a stdio server to the typeless variant with env as name/value pairs", () => {
+    const servers: McpServerConfig[] = [
+      { id: "1", name: "fs", transport: "stdio", command: "node", args: ["server.js"], env: { TOKEN: "abc" } },
+    ];
+    expect(toAcpMcpServers(servers)).toEqual([
+      { name: "fs", command: "node", args: ["server.js"], env: [{ name: "TOKEN", value: "abc" }] },
+    ]);
+  });
+
+  it("maps an sse server to the sse transport", () => {
+    const servers: McpServerConfig[] = [{ id: "2", name: "remote", transport: "sse", url: "https://mcp.example/sse" }];
+    expect(toAcpMcpServers(servers)).toEqual([
+      { type: "sse", name: "remote", url: "https://mcp.example/sse", headers: [] },
+    ]);
+  });
+
+  it("defaults missing args/env to empty", () => {
+    const servers: McpServerConfig[] = [{ id: "3", name: "bare", transport: "stdio", command: "tool" }];
+    expect(toAcpMcpServers(servers)).toEqual([{ name: "bare", command: "tool", args: [], env: [] }]);
+  });
+
+  it("skips incomplete configs (stdio without command, sse without url)", () => {
+    const servers: McpServerConfig[] = [
+      { id: "4", name: "nocmd", transport: "stdio" },
+      { id: "5", name: "nourl", transport: "sse" },
+    ];
+    expect(toAcpMcpServers(servers)).toEqual([]);
   });
 });
 

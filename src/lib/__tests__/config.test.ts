@@ -1,155 +1,118 @@
 import { describe, it, expect } from "vitest";
-import { getCliCommand, DEFAULT_CLI_MODELS, resolveCliModel } from "../config";
+import {
+  DEFAULT_CLI_MODELS,
+  resolveCliModel,
+  getClaudeStreamArgs,
+  getCodexAcpConfigArgs,
+  enrichPromptWithAttachments,
+} from "../config";
 
-describe("getCliCommand", () => {
-  describe("resolveCliModel", () => {
-    it("uses an explicit agent model override first", () => {
-      expect(resolveCliModel("claude", "claude-sonnet-4-6", { claude: "claude-opus-4-1" })).toBe("claude-sonnet-4-6");
-    });
-
-    it("falls back to configured app defaults", () => {
-      expect(resolveCliModel("codex", undefined, { codex: "gpt-5.5" })).toBe("gpt-5.5");
-    });
-
-    it("falls back to built-in defaults when no configured default exists", () => {
-      expect(resolveCliModel("codex")).toBe(DEFAULT_CLI_MODELS.codex);
-    });
+describe("resolveCliModel", () => {
+  it("uses an explicit agent model override first", () => {
+    expect(resolveCliModel("claude", "claude-sonnet-4-6", { claude: "claude-opus-4-1" })).toBe("claude-sonnet-4-6");
   });
 
-  describe("claude", () => {
-    it("produces base command with stream-json output", () => {
-      const { cmd, args } = getCliCommand("claude", "hello", "s1", false);
-      expect(cmd).toBe("claude");
-      expect(args).toContain("-p");
-      expect(args).toContain("--output-format");
-      expect(args).toContain("stream-json");
-      expect(args).toContain("--verbose");
-      expect(args).toContain("--session-id");
-    });
-
-    it("uses --resume for resumed sessions", () => {
-      const { args } = getCliCommand("claude", "hi", "s1", true);
-      expect(args).toContain("--resume");
-      expect(args).toContain("s1");
-      expect(args).not.toContain("--session-id");
-    });
-
-    it("adds --dangerously-skip-permissions for full permission", () => {
-      const { args } = getCliCommand("claude", "hi", "s1", false, undefined, undefined, undefined, "full");
-      expect(args).toContain("--dangerously-skip-permissions");
-    });
-
-    it("adds --permission-mode acceptEdits for auto-edit", () => {
-      const { args } = getCliCommand("claude", "hi", "s1", false, undefined, undefined, undefined, "auto-edit");
-      expect(args).toContain("--permission-mode");
-      expect(args).toContain("acceptEdits");
-    });
-
-    it("adds no permission flag for supervised", () => {
-      const { args } = getCliCommand("claude", "hi", "s1", false, undefined, undefined, undefined, "supervised");
-      expect(args).not.toContain("--dangerously-skip-permissions");
-      expect(args).not.toContain("--permission-mode");
-    });
-
-    it("appends personality as system prompt", () => {
-      const { args } = getCliCommand("claude", "hi", "s1", false, "be nice");
-      expect(args).toContain("--append-system-prompt");
-      expect(args).toContain("be nice");
-    });
-
-    it("passes through an explicit Claude model", () => {
-      const { args } = getCliCommand("claude", "hi", "s1", false, undefined, "sonnet");
-      expect(args).toContain("--model");
-      expect(args).toContain("sonnet");
-    });
+  it("falls back to configured app defaults", () => {
+    expect(resolveCliModel("codex", undefined, { codex: "gpt-5.5" })).toBe("gpt-5.5");
   });
 
-  describe("codex", () => {
-    it("produces base codex command", () => {
-      const { cmd, args, stdin } = getCliCommand("codex", "hello", "s1", false);
-      expect(cmd).toBe("codex");
-      expect(args).toContain("exec");
-      expect(args).toContain("--json");
-      expect(args).toContain("--model");
-      expect(args).toContain(DEFAULT_CLI_MODELS.codex);
-      // Prompt is sent via stdin (`-`), not as an argv arg, to avoid ENAMETOOLONG.
-      expect(args[args.length - 1]).toBe("-");
-      expect(stdin).toBe("hello");
-    });
+  it("falls back to built-in defaults when no configured default exists", () => {
+    expect(resolveCliModel("codex")).toBe(DEFAULT_CLI_MODELS.codex);
+  });
+});
 
-    it("uses exec resume for resumed sessions", () => {
-      const { args } = getCliCommand("codex", "hi", "s1", true);
-      expect(args).toContain("exec");
-      expect(args).toContain("resume");
-      expect(args).toContain("s1");
-      expect(args).toContain("--model");
-      expect(args).toContain(DEFAULT_CLI_MODELS.codex);
-    });
-
-    it("adds bypass flag for full permission", () => {
-      const { args } = getCliCommand("codex", "hi", "s1", false, undefined, undefined, undefined, "full");
-      expect(args).toContain("--dangerously-bypass-approvals-and-sandbox");
-    });
-
-    it("adds workspace-write sandbox for auto-edit", () => {
-      const { args } = getCliCommand("codex", "hi", "s1", false, undefined, undefined, undefined, "auto-edit");
-      expect(args).toContain("-s");
-      expect(args).toContain("workspace-write");
-    });
-
-    it("prepends personality in the stdin prompt", () => {
-      const { stdin } = getCliCommand("codex", "hello", "s1", false, "be terse");
-      expect(stdin).toContain("[System Instructions]");
-      expect(stdin).toContain("be terse");
-      expect(stdin).toContain("hello");
-    });
-
-    it("adds --image= flags for images", () => {
-      const { args } = getCliCommand("codex", "look", "s1", false, undefined, undefined, ["/a.png", "/b.png"]);
-      expect(args).toContain("--image=/a.png");
-      expect(args).toContain("--image=/b.png");
-    });
-
-    it("overrides the default Codex model when configured", () => {
-      const { args } = getCliCommand("codex", "hello", "s1", false, undefined, "gpt-5.5");
-      expect(args).toContain("--model");
-      expect(args).toContain("gpt-5.5");
-      expect(args).not.toContain(DEFAULT_CLI_MODELS.codex);
-    });
+describe("getClaudeStreamArgs", () => {
+  it("produces a stream-json stdin/stdout command", () => {
+    const args = getClaudeStreamArgs("s1", false);
+    expect(args).toContain("--print");
+    expect(args).toContain("--input-format");
+    expect(args).toContain("--output-format");
+    expect(args).toContain("stream-json");
+    expect(args).toContain("--verbose");
+    expect(args).toContain("--session-id");
+    expect(args).toContain("s1");
   });
 
-  describe("image handling", () => {
-    it("adds image instructions to prompt for claude", () => {
-      const { args } = getCliCommand("claude", "describe this", "s1", false, undefined, undefined, ["/img.png"]);
-      const promptIdx = args.indexOf("-p") + 1;
-      expect(args[promptIdx]).toContain("attached image(s)");
-      expect(args[promptIdx]).toContain("/img.png");
-    });
+  it("uses --resume for resumed sessions", () => {
+    const args = getClaudeStreamArgs("s1", true);
+    expect(args).toContain("--resume");
+    expect(args).toContain("s1");
+    expect(args).not.toContain("--session-id");
   });
 
-  describe("thread injection", () => {
-    it("injects thread reference paths into claude prompt", () => {
-      const threadPaths = ["/workspace/.entourage/threads/abc123.json"];
-      const { args } = getCliCommand("claude", "hello", "s1", false, undefined, undefined, undefined, "full", threadPaths);
-      const prompt = args[args.indexOf("-p") + 1];
-      expect(prompt).toContain("reference conversation thread");
-      expect(prompt).toContain("MUST NOT modify");
-      expect(prompt).toContain("abc123.json");
-      expect(prompt).toContain("User message: hello");
-    });
+  it("maps permission levels to flags", () => {
+    expect(getClaudeStreamArgs("s1", false, undefined, undefined, "full")).toContain("--dangerously-skip-permissions");
+    const autoEdit = getClaudeStreamArgs("s1", false, undefined, undefined, "auto-edit");
+    expect(autoEdit).toContain("--permission-mode");
+    expect(autoEdit).toContain("acceptEdits");
+    const supervised = getClaudeStreamArgs("s1", false, undefined, undefined, "supervised");
+    expect(supervised).not.toContain("--dangerously-skip-permissions");
+    expect(supervised).not.toContain("--permission-mode");
+  });
 
-    it("does not inject thread text when no threadPaths provided", () => {
-      const { args } = getCliCommand("claude", "hello", "s1", false);
-      const prompt = args[args.indexOf("-p") + 1];
-      expect(prompt).not.toContain("reference conversation thread");
-      expect(prompt).toBe("hello");
-    });
+  it("appends personality, model, and mcp config", () => {
+    const args = getClaudeStreamArgs("s1", false, "be nice", "sonnet", "full", "/tmp/mcp.json");
+    expect(args).toContain("--append-system-prompt");
+    expect(args).toContain("be nice");
+    expect(args).toContain("--model");
+    expect(args).toContain("sonnet");
+    expect(args).toContain("--mcp-config");
+    expect(args).toContain("/tmp/mcp.json");
+  });
+});
 
-    it("combines image and thread injection", () => {
-      const { args } = getCliCommand("claude", "hello", "s1", false, undefined, undefined, ["/img.png"], "full", ["/thread.json"]);
-      const prompt = args[args.indexOf("-p") + 1];
-      expect(prompt).toContain("attached image");
-      expect(prompt).toContain("reference conversation thread");
-    });
+describe("getCodexAcpConfigArgs", () => {
+  it("passes the model override as a -c config", () => {
+    const args = getCodexAcpConfigArgs("gpt-5.4", "full");
+    expect(args).toContain("-c");
+    expect(args).toContain('model="gpt-5.4"');
+  });
+
+  it("omits the model override when none is given", () => {
+    const args = getCodexAcpConfigArgs(undefined, "full");
+    expect(args.some((a) => a.startsWith("model="))).toBe(false);
+  });
+
+  it("maps full to never approvals + full access", () => {
+    const args = getCodexAcpConfigArgs(undefined, "full");
+    expect(args).toContain('approval_policy="never"');
+    expect(args).toContain('sandbox_mode="danger-full-access"');
+  });
+
+  it("maps auto-edit to workspace-write", () => {
+    const args = getCodexAcpConfigArgs(undefined, "auto-edit");
+    expect(args).toContain('approval_policy="on-request"');
+    expect(args).toContain('sandbox_mode="workspace-write"');
+  });
+
+  it("maps supervised to read-only", () => {
+    const args = getCodexAcpConfigArgs(undefined, "supervised");
+    expect(args).toContain('sandbox_mode="read-only"');
+  });
+});
+
+describe("enrichPromptWithAttachments", () => {
+  it("returns the prompt unchanged with no attachments", () => {
+    expect(enrichPromptWithAttachments("hello")).toBe("hello");
+  });
+
+  it("adds image instructions and paths", () => {
+    const out = enrichPromptWithAttachments("describe this", ["/img.png"]);
+    expect(out).toContain("attached image(s)");
+    expect(out).toContain("/img.png");
+    expect(out).toContain("User message: describe this");
+  });
+
+  it("injects reference-thread instructions", () => {
+    const out = enrichPromptWithAttachments("hello", undefined, ["/workspace/.entourage/threads/abc123.json"]);
+    expect(out).toContain("reference conversation thread");
+    expect(out).toContain("MUST NOT modify");
+    expect(out).toContain("abc123.json");
+  });
+
+  it("combines image and thread injection", () => {
+    const out = enrichPromptWithAttachments("hello", ["/img.png"], ["/thread.json"]);
+    expect(out).toContain("attached image");
+    expect(out).toContain("reference conversation thread");
   });
 });

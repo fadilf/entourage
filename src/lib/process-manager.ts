@@ -1,6 +1,6 @@
 import { spawn as cpSpawn, ChildProcess } from "child_process";
-import { getCliCommand, getClaudeStreamArgs, enrichPromptWithAttachments } from "./config";
-import { ThreadProcess, AgentModel, PermissionLevel } from "./types";
+import { getClaudeStreamArgs, enrichPromptWithAttachments } from "./config";
+import { ThreadProcess, AgentModel, PermissionLevel, McpServerConfig } from "./types";
 import { AcpConnection } from "./acp-client";
 import { buildCodexAcpPrompt, translateAcpUpdate, decideCodexPermission } from "./acp-codex";
 import { StreamEvent } from "./stream-parser";
@@ -93,36 +93,11 @@ function summarizeStderr(stderr: string): string {
   return firstLine.length > 200 ? firstLine.slice(0, 200) + "..." : firstLine;
 }
 
-/**
- * Check if a parsed JSON line indicates a resume failure.
- */
-function isResumeError(json: Record<string, unknown>, model: AgentModel): boolean {
-  // Claude: result event with error flag
-  if (json.type === "result" && json.is_error === true) return true;
-  // Codex: turn.failed or stream-level error
-  if (model === "codex" && (json.type === "turn.failed" || json.type === "error")) return true;
-  return false;
-}
-
-/**
- * Check if a parsed JSON line indicates the session is alive (resume succeeded).
- */
-function hasSuccessSignal(json: Record<string, unknown>, model: AgentModel): boolean {
-  if (model === "codex") {
-    // Codex: item events or turn.started mean the session is active
-    const t = json.type as string;
-    return t === "item.started" || t === "item.updated" || t === "item.completed" || t === "turn.started";
-  }
-  // Claude: anything that's not a "result" event
-  return json.type !== "result";
-}
-
 class ProcessManager {
   private processes = new Map<string, ProcessEntry>();
   private usedSessions = new Set<string>(); // Track sessions that have been used
   private killedSessions = new Set<string>(); // Track sessions killed intentionally
   private sessionOverrides = new Map<string, string>(); // Override sessionId after rewind
-  private codexSessionIds = new Map<string, string>(); // Captured real Codex thread_ids
 
   private key(threadId: string, agentId: string): string {
     return `${threadId}:${agentId}`;
@@ -144,249 +119,11 @@ class ProcessManager {
 
   private getSessionId(threadId: string, agentId: string): string {
     const k = this.key(threadId, agentId);
-    // For Codex, prefer the real session ID captured from thread.started events
-    return this.codexSessionIds.get(k) ?? this.sessionOverrides.get(k) ?? this.baseSessionId(threadId, agentId);
-  }
-
-  /**
-   * Parse Codex JSONL stdout for thread.started events to capture the real session ID.
-   * Codex generates its own session ID internally — we must capture and reuse it for resume.
-   */
-  private captureCodexSessionId(chunk: string, key: string): void {
-    for (const line of chunk.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const json = JSON.parse(trimmed);
-        if (json.type === "thread.started" && typeof json.thread_id === "string") {
-          this.codexSessionIds.set(key, json.thread_id);
-          return;
-        }
-      } catch { /* not JSON */ }
-    }
+    return this.sessionOverrides.get(k) ?? this.baseSessionId(threadId, agentId);
   }
 
   private newSessionId(): string {
     return crypto.randomUUID();
-  }
-
-  spawn(
-    threadId: string,
-    agentId: string,
-    model: AgentModel,
-    cliModel: string | undefined,
-    prompt: string,
-    cwd: string,
-    onData: (chunk: string) => void,
-    onClose: (code: number | null) => void,
-    onError: (err: Error) => void,
-    hasHistory: boolean = false,
-    personality?: string,
-    imagePaths?: string[],
-    fullHistoryPrompt?: string,
-    permissionLevel: PermissionLevel = "full",
-    threadPaths?: string[],
-    mcpConfigPath?: string
-  ): ChildProcess {
-    const k = this.key(threadId, agentId);
-
-    // Kill existing process if any
-    this.kill(threadId, agentId);
-
-    const sessionId = this.getSessionId(threadId, agentId);
-    const wasRewound = this.sessionOverrides.has(k);
-    const isResume = (this.usedSessions.has(sessionId) || hasHistory) && !wasRewound;
-
-    // After rewind, use full history prompt so the fresh session has full context
-    const effectivePrompt = (!isResume && wasRewound && fullHistoryPrompt) ? fullHistoryPrompt : prompt;
-
-    const { cmd, args, stdin } = getCliCommand(model, effectivePrompt, sessionId, isResume, personality, cliModel, imagePaths, permissionLevel, threadPaths, mcpConfigPath);
-
-    const child = cpSpawn(cmd, args, {
-      cwd,
-      stdio: [stdin !== undefined ? "pipe" : "ignore", "pipe", "pipe"],
-      env: { ...process.env },
-    });
-    if (stdin !== undefined) {
-      // Prompt travels via stdin (codex `-`), bypassing the argv length limit.
-      try { child.stdin?.write(stdin); child.stdin?.end(); } catch { /* stdin closed */ }
-    }
-
-    const entry: ProcessEntry = {
-      process: child,
-      threadId,
-      agentId,
-      model,
-      status: "running",
-      buffer: [],
-      stderrBuffer: [],
-      accumulatedContent: "",
-      accumulatedBlocks: [],
-    };
-    this.processes.set(k, entry);
-
-    // When resuming, defer onData until we confirm the session exists.
-    // If --resume fails (error result), we retry with --session-id and discard error output.
-    // Once we see a non-result line (e.g. system/init/assistant), flush and stream normally.
-    let deferredChunks: string[] | null = isResume ? [] : null;
-
-    child.stdout?.on("data", (data: Buffer) => {
-      const chunk = data.toString();
-      entry.buffer.push(chunk);
-      if (entry.buffer.length > MAX_BUFFER_CHUNKS) {
-        entry.buffer.shift();
-      }
-
-      // Capture Codex's real session ID from thread.started events
-      if (model === "codex") {
-        this.captureCodexSessionId(chunk, k);
-      }
-
-      if (deferredChunks) {
-        // Check if this chunk contains a non-error line, meaning resume succeeded
-        const hasNonErrorContent = chunk.split("\n").some((line) => {
-          const trimmed = line.trim();
-          if (!trimmed) return false;
-          try {
-            const json = JSON.parse(trimmed);
-            return hasSuccessSignal(json, model);
-          } catch {
-            return model !== "codex"; // Non-JSON: real content for Claude, noise for Codex
-          }
-        });
-        if (hasNonErrorContent) {
-          // Resume succeeded — flush deferred chunks and switch to direct forwarding
-          for (const deferred of deferredChunks) {
-            onData(deferred);
-          }
-          deferredChunks = null;
-          onData(chunk);
-        } else {
-          deferredChunks.push(chunk);
-        }
-      } else {
-        onData(chunk);
-      }
-    });
-
-    child.stderr?.on("data", (data: Buffer) => {
-      const chunk = data.toString();
-      entry.stderrBuffer.push(chunk);
-      if (entry.stderrBuffer.length > MAX_BUFFER_CHUNKS) {
-        entry.stderrBuffer.shift();
-      }
-      // Don't forward stderr as content — it's collected for error reporting
-    });
-
-    child.on("error", (err) => {
-      entry.status = "error";
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        onError(new Error(`CLI "${cmd}" not found. Make sure it is installed and in your PATH.`));
-      } else {
-        onError(err);
-      }
-    });
-
-    child.on("close", (code) => {
-      // Check if --resume produced only an error result (session not found).
-      // The CLI may exit with code 0 but output an error JSON with is_error:true.
-      const resumeFailedWithError = isResume && entry.buffer.length > 0 && (() => {
-        const output = entry.buffer.join("").trim();
-        try {
-          const lastLine = output.split("\n").filter(l => l.trim()).pop() ?? "";
-          const json = JSON.parse(lastLine);
-          return isResumeError(json, model);
-        } catch {
-          return false;
-        }
-      })();
-
-      if (code !== 0 || resumeFailedWithError) {
-        // If --resume failed (no output or error result), the session likely doesn't exist.
-        // Retry with --session-id to start a fresh CLI session.
-        if (isResume && (entry.buffer.length === 0 || resumeFailedWithError)) {
-          this.processes.delete(k);
-          // Use full history prompt so the fresh session has conversation context
-          const retryPrompt = fullHistoryPrompt || prompt;
-          const fresh = getCliCommand(model, retryPrompt, sessionId, false, personality, cliModel, imagePaths, permissionLevel, threadPaths, mcpConfigPath);
-          const retryChild = cpSpawn(fresh.cmd, fresh.args, {
-            cwd,
-            stdio: [fresh.stdin !== undefined ? "pipe" : "ignore", "pipe", "pipe"],
-            env: { ...process.env },
-          });
-          if (fresh.stdin !== undefined) {
-            try { retryChild.stdin?.write(fresh.stdin); retryChild.stdin?.end(); } catch { /* stdin closed */ }
-          }
-          const retryEntry: ProcessEntry = {
-            process: retryChild,
-            threadId,
-            agentId,
-            model,
-            status: "running",
-            buffer: [],
-            stderrBuffer: [],
-            accumulatedContent: "",
-            accumulatedBlocks: [],
-          };
-          this.processes.set(k, retryEntry);
-
-          retryChild.stdout?.on("data", (data: Buffer) => {
-            const chunk = data.toString();
-            retryEntry.buffer.push(chunk);
-            if (retryEntry.buffer.length > MAX_BUFFER_CHUNKS) retryEntry.buffer.shift();
-            // Capture Codex's real session ID from retry
-            if (model === "codex") {
-              this.captureCodexSessionId(chunk, k);
-            }
-            onData(chunk);
-          });
-          retryChild.stderr?.on("data", (data: Buffer) => {
-            const chunk = data.toString();
-            retryEntry.stderrBuffer.push(chunk);
-            if (retryEntry.stderrBuffer.length > MAX_BUFFER_CHUNKS) retryEntry.stderrBuffer.shift();
-          });
-          retryChild.on("error", (err) => {
-            retryEntry.status = "error";
-            onError(err);
-          });
-          retryChild.on("close", (retryCode) => {
-            if (retryCode !== 0) {
-              retryEntry.status = "error";
-              if (retryEntry.stderrBuffer.length > 0) {
-                const stderrText = retryEntry.stderrBuffer.join("").trim();
-                if (stderrText) onError(new Error(summarizeStderr(stderrText)));
-              }
-            } else {
-              this.killedSessions.delete(sessionId);
-              this.sessionOverrides.delete(k);
-              this.usedSessions.add(sessionId);
-            }
-            onClose(retryCode);
-            this.processes.delete(k);
-          });
-          return;
-        }
-
-        entry.status = "error";
-        // If process failed and we have stderr, report it as an error
-        if (entry.stderrBuffer.length > 0) {
-          const stderrText = entry.stderrBuffer.join("").trim();
-          if (stderrText) {
-            onError(new Error(summarizeStderr(stderrText)));
-          }
-        }
-      } else {
-        // Mark session as used so follow-ups use --resume
-        this.killedSessions.delete(sessionId);
-        this.sessionOverrides.delete(k);
-        this.usedSessions.add(sessionId);
-      }
-      onClose(code);
-      // Clean up after process exits
-      this.processes.delete(k);
-    });
-
-    return child;
   }
 
   /**
@@ -644,7 +381,8 @@ class ProcessManager {
     imagePaths?: string[],
     fullHistoryPrompt?: string,
     permissionLevel: PermissionLevel = "full",
-    threadPaths?: string[]
+    threadPaths?: string[],
+    mcpServers?: McpServerConfig[]
   ): void {
     const k = this.key(threadId, agentId);
     const existing = this.processes.get(k);
@@ -662,7 +400,7 @@ class ProcessManager {
     const firstText = (hasHistory && fullHistoryPrompt) ? fullHistoryPrompt : prompt;
     const firstBlocks = buildCodexAcpPrompt(firstText, personality, imagePaths, threadPaths);
     this.spawnPersistentCodex(
-      threadId, agentId, cliModel, permissionLevel, cwd,
+      threadId, agentId, cliModel, permissionLevel, cwd, mcpServers,
       [{ prompt: firstBlocks, onEvents, onTurnEnd, onError }]
     );
   }
@@ -673,10 +411,11 @@ class ProcessManager {
     cliModel: string | undefined,
     permissionLevel: PermissionLevel,
     cwd: string,
+    mcpServers: McpServerConfig[] | undefined,
     queue: CodexTurn[]
   ): void {
     const k = this.key(threadId, agentId);
-    const acp = new AcpConnection({ cwd, cliModel, permissionLevel });
+    const acp = new AcpConnection({ cwd, cliModel, permissionLevel, mcpServers });
 
     const entry: ProcessEntry = {
       process: acp.child,
@@ -874,7 +613,6 @@ class ProcessManager {
       const oldSessionId = this.getSessionId(threadId, agentId);
       this.usedSessions.delete(oldSessionId);
       this.killedSessions.add(oldSessionId);
-      this.codexSessionIds.delete(k);
       this.sessionOverrides.set(k, this.newSessionId());
     }
   }
