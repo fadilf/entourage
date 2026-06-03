@@ -1,6 +1,10 @@
 import { spawn as cpSpawn, ChildProcess } from "child_process";
 import { getCliCommand, getClaudeStreamArgs, enrichPromptWithAttachments } from "./config";
 import { ThreadProcess, AgentModel, PermissionLevel } from "./types";
+import { AcpConnection } from "./acp-client";
+import { buildCodexAcpPrompt, translateAcpUpdate, decideCodexPermission } from "./acp-codex";
+import { StreamEvent } from "./stream-parser";
+import type { ContentBlock } from "@agentclientprotocol/sdk";
 import crypto from "crypto";
 
 /**
@@ -13,6 +17,24 @@ type TurnHandlers = {
   onData: (chunk: string) => void;
   onTurnEnd: (status: "complete" | "error") => void;
   onError: (err: Error) => void;
+};
+
+/**
+ * Callbacks for a single Codex/ACP turn. Like TurnHandlers but the adapter
+ * streams typed ACP updates rather than raw stdout, so handlers receive already
+ * translated StreamEvents and the prompt is carried as ACP content blocks.
+ */
+type CodexTurn = {
+  prompt: ContentBlock[];
+  onEvents: (events: StreamEvent[]) => void;
+  onTurnEnd: (status: "complete" | "error") => void;
+  onError: (err: Error) => void;
+};
+
+/** A re-attach listener subscribed to a live ACP turn (page-reload reconnect). */
+type AcpSubscriber = {
+  onEvents: (events: StreamEvent[]) => void;
+  onDone: (status: "complete" | "error") => void;
 };
 
 type ProcessEntry = {
@@ -35,6 +57,12 @@ type ProcessEntry = {
   retried?: boolean; // Has the resume→fresh fallback already fired once
   killed?: boolean; // Intentionally terminated (stop/rewind/idle) — suppress retry
   idleTimer?: NodeJS.Timeout; // Kills the process after a period with no active turn
+  // --- Persistent Codex (ACP) session fields ---
+  acp?: AcpConnection; // ACP connection wrapping the codex-acp adapter
+  acpSessionId?: string; // The ACP session id from session/new
+  codexTurnQueue?: CodexTurn[]; // FIFO of pending/active ACP turns; front = active
+  codexDraining?: boolean; // Whether runCodexQueue is currently draining the queue
+  subscribers?: Set<AcpSubscriber>; // Re-attach listeners on the live turn
 };
 
 const MAX_BUFFER_CHUNKS = 100;
@@ -594,11 +622,168 @@ class ProcessManager {
     );
   }
 
+  /**
+   * Start a turn on the persistent Codex (ACP) session for (threadId, agentId).
+   * If a live session exists, the message is queued and sent via session/prompt
+   * after the current turn finishes (send-while-running). Otherwise the codex-acp
+   * adapter is spawned and a new session created. On cold start with prior
+   * history, the full-history prompt seeds the fresh session (ACP loadSession is
+   * not used — newSession + full history mirrors the Claude resume fallback).
+   */
+  startCodexTurn(
+    threadId: string,
+    agentId: string,
+    cliModel: string | undefined,
+    prompt: string,
+    cwd: string,
+    onEvents: (events: StreamEvent[]) => void,
+    onTurnEnd: (status: "complete" | "error") => void,
+    onError: (err: Error) => void,
+    hasHistory: boolean = false,
+    personality?: string,
+    imagePaths?: string[],
+    fullHistoryPrompt?: string,
+    permissionLevel: PermissionLevel = "full",
+    threadPaths?: string[]
+  ): void {
+    const k = this.key(threadId, agentId);
+    const existing = this.processes.get(k);
+
+    if (existing && existing.acp && existing.persistent && existing.status === "running") {
+      // Live session — queue this turn onto it.
+      if (existing.idleTimer) { clearTimeout(existing.idleTimer); existing.idleTimer = undefined; }
+      const blocks = buildCodexAcpPrompt(prompt, personality, imagePaths, threadPaths);
+      existing.codexTurnQueue!.push({ prompt: blocks, onEvents, onTurnEnd, onError });
+      if (!existing.codexDraining) void this.runCodexQueue(existing);
+      return;
+    }
+
+    // No live session — cold start. Seed with full history if there's prior context.
+    const firstText = (hasHistory && fullHistoryPrompt) ? fullHistoryPrompt : prompt;
+    const firstBlocks = buildCodexAcpPrompt(firstText, personality, imagePaths, threadPaths);
+    this.spawnPersistentCodex(
+      threadId, agentId, cliModel, permissionLevel, cwd,
+      [{ prompt: firstBlocks, onEvents, onTurnEnd, onError }]
+    );
+  }
+
+  private spawnPersistentCodex(
+    threadId: string,
+    agentId: string,
+    cliModel: string | undefined,
+    permissionLevel: PermissionLevel,
+    cwd: string,
+    queue: CodexTurn[]
+  ): void {
+    const k = this.key(threadId, agentId);
+    const acp = new AcpConnection({ cwd, cliModel, permissionLevel });
+
+    const entry: ProcessEntry = {
+      process: acp.child,
+      acp,
+      threadId,
+      agentId,
+      model: "codex",
+      status: "running",
+      buffer: [],
+      stderrBuffer: [],
+      accumulatedContent: "",
+      accumulatedBlocks: [],
+      persistent: true,
+      codexTurnQueue: queue,
+      codexDraining: false,
+      everSucceeded: false,
+      subscribers: new Set(),
+    };
+    this.processes.set(k, entry);
+
+    acp.onSessionUpdate = (update) => {
+      const events = translateAcpUpdate(update);
+      if (events.length === 0) return;
+      const active = entry.codexTurnQueue?.[0];
+      if (active) { try { active.onEvents(events); } catch { /* controller closed */ } }
+      entry.subscribers?.forEach((s) => { try { s.onEvents(events); } catch { /* ignore */ } });
+    };
+    acp.onPermissionRequest = (options) => decideCodexPermission(options, permissionLevel);
+    acp.onStderr = (chunk) => {
+      entry.stderrBuffer.push(chunk);
+      if (entry.stderrBuffer.length > MAX_BUFFER_CHUNKS) entry.stderrBuffer.shift();
+    };
+    acp.onClose = () => {
+      if (entry.idleTimer) { clearTimeout(entry.idleTimer); entry.idleTimer = undefined; }
+      if (this.processes.get(k) === entry) this.processes.delete(k);
+      if (entry.killed) return; // Intentional shutdown — turns already settled.
+      // Unexpected exit: fail any pending turns and close re-attach streams.
+      const stderrText = entry.stderrBuffer.join("").trim();
+      for (const t of entry.codexTurnQueue ?? []) {
+        if (stderrText) { try { t.onError(new Error(summarizeStderr(stderrText))); } catch { /* ignore */ } }
+        else { try { t.onTurnEnd("error"); } catch { /* ignore */ } }
+      }
+      entry.codexTurnQueue = [];
+      entry.subscribers?.forEach((s) => { try { s.onDone("error"); } catch { /* ignore */ } });
+    };
+    acp.onError = (err) => {
+      entry.status = "error";
+      for (const t of entry.codexTurnQueue ?? []) { try { t.onError(err); } catch { /* ignore */ } }
+      entry.codexTurnQueue = [];
+    };
+
+    // Establish the connection and drain the queue.
+    void this.driveCodex(entry).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      for (const t of entry.codexTurnQueue ?? []) { try { t.onError(new Error(message)); } catch { /* ignore */ } }
+      entry.codexTurnQueue = [];
+      entry.subscribers?.forEach((s) => { try { s.onDone("error"); } catch { /* ignore */ } });
+      this.kill(threadId, agentId);
+    });
+  }
+
+  private async driveCodex(entry: ProcessEntry): Promise<void> {
+    const acp = entry.acp!;
+    await acp.connect();
+    await acp.initialize();
+    entry.acpSessionId = await acp.newSession();
+    await this.runCodexQueue(entry);
+  }
+
+  /** Drain the ACP turn queue, running one session/prompt at a time (FIFO). */
+  private async runCodexQueue(entry: ProcessEntry): Promise<void> {
+    if (entry.codexDraining) return;
+    if (!entry.acp || !entry.acpSessionId) return;
+    entry.codexDraining = true;
+    try {
+      while (!entry.killed && entry.codexTurnQueue && entry.codexTurnQueue.length > 0) {
+        const turn = entry.codexTurnQueue[0];
+        try {
+          await entry.acp.prompt(entry.acpSessionId, turn.prompt);
+        } catch (err) {
+          entry.codexTurnQueue.shift();
+          const e = err instanceof Error ? err : new Error(String(err));
+          try { turn.onError(e); } catch { /* ignore */ }
+          entry.subscribers?.forEach((s) => { try { s.onDone("error"); } catch { /* ignore */ } });
+          continue;
+        }
+        // Any stop reason (end_turn, refusal, cancelled, …) ends the turn with the
+        // content produced so far; only thrown errors are treated as failures.
+        entry.codexTurnQueue.shift();
+        entry.everSucceeded = true;
+        try { turn.onTurnEnd("complete"); } catch { /* ignore */ }
+        entry.subscribers?.forEach((s) => { try { s.onDone("complete"); } catch { /* ignore */ } });
+      }
+    } finally {
+      entry.codexDraining = false;
+      if ((entry.codexTurnQueue?.length ?? 0) === 0) this.armIdleTimer(entry);
+    }
+  }
+
   private armIdleTimer(entry: ProcessEntry): void {
+    if (entry.killed) return;
     if (entry.idleTimer) clearTimeout(entry.idleTimer);
     entry.idleTimer = setTimeout(() => {
-      if ((entry.turnQueue?.length ?? 0) === 0 && entry.status === "running") {
+      const pending = (entry.turnQueue?.length ?? 0) + (entry.codexTurnQueue?.length ?? 0);
+      if (pending === 0 && entry.status === "running") {
         entry.killed = true;
+        if (entry.acp && entry.acpSessionId) entry.acp.cancel(entry.acpSessionId);
         try { entry.process.stdin?.end(); } catch { /* ignore */ }
         try { entry.process.kill("SIGTERM"); } catch { /* ignore */ }
       }
@@ -613,7 +798,8 @@ class ProcessManager {
 
     entry.killed = true;
     if (entry.idleTimer) { clearTimeout(entry.idleTimer); entry.idleTimer = undefined; }
-    if (entry.persistent) { try { entry.process.stdin?.end(); } catch { /* ignore */ } }
+    if (entry.acp && entry.acpSessionId) entry.acp.cancel(entry.acpSessionId);
+    if (entry.persistent && !entry.acp) { try { entry.process.stdin?.end(); } catch { /* ignore */ } }
     try {
       entry.process.kill("SIGTERM");
       // Force kill after 5s
@@ -638,7 +824,7 @@ class ProcessManager {
    */
   private isActive(entry: ProcessEntry): boolean {
     if (entry.status !== "running") return false;
-    if (entry.persistent) return (entry.turnQueue?.length ?? 0) > 0;
+    if (entry.persistent) return ((entry.turnQueue?.length ?? 0) + (entry.codexTurnQueue?.length ?? 0)) > 0;
     return true;
   }
 
@@ -660,7 +846,8 @@ class ProcessManager {
         this.killedSessions.add(sessionId);
         entry.killed = true;
         if (entry.idleTimer) { clearTimeout(entry.idleTimer); entry.idleTimer = undefined; }
-        if (entry.persistent) { try { entry.process.stdin?.end(); } catch { /* ignore */ } }
+        if (entry.acp && entry.acpSessionId) entry.acp.cancel(entry.acpSessionId);
+        if (entry.persistent && !entry.acp) { try { entry.process.stdin?.end(); } catch { /* ignore */ } }
         try {
           entry.process.kill("SIGTERM");
           const timer = setTimeout(() => {

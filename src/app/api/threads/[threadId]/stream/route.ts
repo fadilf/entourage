@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getThread, addMessage, updateMessage, addUnreadAgent } from "@/lib/thread-store";
 import { getProcessManager } from "@/lib/process-manager";
-import { createStreamParser } from "@/lib/stream-parser";
+import { createStreamParser, StreamEvent } from "@/lib/stream-parser";
 import { MessageImage, ToolCall, ContentBlock, PermissionDenial, isAgentModel } from "@/lib/types";
 import { loadAgents, loadDefaultCliModels, loadQuickReplies } from "@/lib/agent-store";
 import { buildContextualPrompt, buildFullHistoryPrompt } from "@/lib/context";
@@ -60,6 +60,70 @@ export async function POST(
   // any repeat send (they can't accept a mid-run prompt).
   const existing = pm.getProcess(threadId, agentId);
   const shouldReattach = existing && (!prompt || !existing.persistent);
+  if (existing && shouldReattach && existing.acp) {
+    // Codex (ACP) re-attach: there's no raw stdout to re-parse, so subscribe to
+    // the live turn's translated events and replay the accumulated snapshot.
+    const acpEntry = existing;
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        let clientDisconnected = false;
+        let finished = false;
+        request.signal.addEventListener("abort", () => { clientDisconnected = true; });
+
+        if (acpEntry.accumulatedContent || acpEntry.accumulatedBlocks.length > 0) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({
+              type: "initial",
+              content: acpEntry.accumulatedContent,
+              ...(acpEntry.accumulatedBlocks.length > 0 ? { blocks: acpEntry.accumulatedBlocks } : {}),
+            })}\n\n`)
+          );
+        }
+
+        const sub = {
+          onEvents: (events: StreamEvent[]) => {
+            for (const event of events) {
+              if (event.type === "content" || event.type.startsWith("tool_")) {
+                try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`)); } catch { /* closed */ }
+              }
+            }
+          },
+          onDone: (status: "complete" | "error") => finish(status),
+        };
+
+        function finish(status: "complete" | "error") {
+          if (finished) return;
+          finished = true;
+          acpEntry.subscribers?.delete(sub);
+          if (clientDisconnected && status === "complete") {
+            addUnreadAgent(workspaceDir, threadId, agentId).catch(() => {});
+          }
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done", status })}\n\n`));
+            controller.close();
+          } catch { /* Already closed */ }
+        }
+
+        // No active turn → nothing to stream; send completion immediately.
+        if ((acpEntry.codexTurnQueue?.length ?? 0) === 0) {
+          finish("complete");
+          return;
+        }
+        acpEntry.subscribers?.add(sub);
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "Content-Encoding": "none",
+        "X-Accel-Buffering": "no",
+      },
+    });
+  }
   if (existing && shouldReattach) {
     const isPersistent = !!existing.persistent;
     // Return existing buffer as SSE stream then continue piping
@@ -212,8 +276,7 @@ export async function POST(
       const cwd = workspaceDir;
 
       try {
-        const handleData = (chunk: string) => {
-            const events = parser(chunk);
+        const processEvents = (events: StreamEvent[]) => {
             for (const event of events) {
               if (event.type === "content") {
                 accumulatedContent += event.text;
@@ -334,6 +397,9 @@ export async function POST(
               }).catch(() => {});
             }
         };
+        // Claude streams raw stdout (parse → events); Codex (ACP) delivers
+        // already translated events, so it calls processEvents directly.
+        const handleData = (chunk: string) => processEvents(parser(chunk));
         const handleClose = (code: number | null) => {
             const status = code === 0 ? "complete" : "error";
             if (clientDisconnected && status === "complete") {
@@ -440,23 +506,24 @@ export async function POST(
             mcpConfigPath
           );
         } else {
-          pm.spawn(
+          // Persistent Codex session over ACP: the codex-acp adapter stays alive
+          // so follow-up turns queue onto it (send-while-running), and it streams
+          // typed ACP updates that processEvents consumes directly.
+          pm.startCodexTurn(
             threadId,
             agent.id,
-            agentModel,
             effectiveCliModel,
             enrichedPrompt,
             cwd,
-            handleData,
-            handleClose,
+            processEvents,
+            (status) => handleClose(status === "complete" ? 0 : 1),
             handleError,
             hasHistory,
             effectivePersonality,
             imagePathsArg,
             fullHistoryPrompt,
             permissionLevel,
-            threadPathsArg,
-            mcpConfigPath
+            threadPathsArg
           );
         }
       } catch (err) {

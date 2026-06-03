@@ -150,16 +150,19 @@ export default function ThreadDetail({
 
   const hasQuickReplies = (suggestions?.length ?? 0) > 0;
 
-  // A follow-up can be queued while streaming only when every currently-streaming
-  // agent is Claude (its persistent session accepts queued turns). For other
-  // models the input stays disabled while running, as before.
+  // A follow-up can be queued while streaming when every currently-streaming
+  // agent runs a persistent session that accepts queued turns. Both Claude
+  // (stream-json stdin) and Codex (ACP) qualify; any other model keeps the input
+  // disabled while running.
+  const QUEUEABLE_MODELS = ["claude", "codex"];
   const streamingAgentIds = Array.from(streamingMessages.keys());
-  const onlyClaudeStreaming =
+  const canQueueWhileStreaming =
     isStreaming &&
     streamingAgentIds.length > 0 &&
-    streamingAgentIds.every(
-      (id) => thread.agents.find((a) => a.id === id)?.model === "claude"
-    );
+    streamingAgentIds.every((id) => {
+      const model = thread.agents.find((a) => a.id === id)?.model;
+      return model !== undefined && QUEUEABLE_MODELS.includes(model);
+    });
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -395,9 +398,9 @@ export default function ThreadDetail({
           allAgents={allAgents}
           onSendMessage={onSendMessage}
           onStop={onStop}
-          disabled={isStreaming && !onlyClaudeStreaming}
+          disabled={isStreaming && !canQueueWhileStreaming}
           streaming={isStreaming}
-          allowQueue={onlyClaudeStreaming}
+          allowQueue={canQueueWhileStreaming}
           isMobile={isMobile}
           onDraftChange={onDraftChange}
           showTopBorder={false}

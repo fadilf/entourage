@@ -155,6 +155,29 @@ export function getClaudeStreamArgs(
   return args;
 }
 
+/**
+ * Build `-c key=value` config overrides for the codex-acp adapter. These map the
+ * app's PermissionLevel onto Codex's own `approval_policy` / `sandbox_mode`
+ * settings (the same knobs the `codex` CLI exposes via `-s` and
+ * `--dangerously-bypass-approvals-and-sandbox`), plus an optional model override.
+ * Values are quoted so codex-acp parses them as TOML strings.
+ */
+export function getCodexAcpConfigArgs(cliModel: string | undefined, permissionLevel: PermissionLevel = "full"): string[] {
+  const args: string[] = [];
+  if (cliModel) {
+    args.push("-c", `model="${cliModel}"`);
+  }
+  if (permissionLevel === "full") {
+    args.push("-c", `approval_policy="never"`, "-c", `sandbox_mode="danger-full-access"`);
+  } else if (permissionLevel === "auto-edit") {
+    args.push("-c", `approval_policy="on-request"`, "-c", `sandbox_mode="workspace-write"`);
+  } else {
+    // "supervised" — read-only sandbox; escalations surface as permission requests
+    args.push("-c", `approval_policy="on-request"`, "-c", `sandbox_mode="read-only"`);
+  }
+  return args;
+}
+
 export function getCliCommand(model: AgentModel, prompt: string, sessionId: string, isResume: boolean, personality?: string, cliModel?: string, imagePaths?: string[], permissionLevel: PermissionLevel = "full", threadPaths?: string[], mcpConfigPath?: string): { cmd: string; args: string[]; stdin?: string } {
   const hasImages = imagePaths && imagePaths.length > 0;
   const effectiveCliModel = resolveCliModel(model, cliModel);
