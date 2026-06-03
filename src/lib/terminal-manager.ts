@@ -23,12 +23,17 @@ class TerminalManager {
     // Kill existing session with this ID
     this.kill(sessionId);
 
-    const shell = process.env.SHELL || (os.platform() === "win32" ? "powershell.exe" : "bash");
+    const isWindows = os.platform() === "win32";
+    const shell = process.env.SHELL || (isWindows ? "powershell.exe" : "bash");
+
+    // `--login` is a POSIX-shell flag (bash/zsh); PowerShell/cmd choke on it.
+    // Only pass it when we're confident the shell is a login-capable Unix shell.
+    const shellArgs = isWindows ? [] : ["--login"];
 
     // Fall back to home dir if cwd doesn't exist (e.g. deleted workspace)
     const safeCwd = fs.existsSync(cwd) ? cwd : os.homedir();
 
-    const pty = ptySpawn(shell, ["--login"], {
+    const pty = ptySpawn(shell, shellArgs, {
       name: "xterm-256color",
       cols: 80,
       rows: 24,
