@@ -19,6 +19,12 @@ export const PLUGINS: Plugin[] = [
     icon: "Terminal",
     enabledByDefault: false,
   },
+  {
+    id: "system",
+    name: "Resource Monitor",
+    icon: "Activity",
+    enabledByDefault: false,
+  },
 ];
 
 export function mapGitStatus(code: string): GitFileEntry["status"] {

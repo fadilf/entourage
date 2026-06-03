@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Trash2, FolderOpen, Settings, Palette, GitBranch, HelpCircle, Terminal, Paintbrush } from "lucide-react";
+import { Plus, Trash2, FolderOpen, Settings, Palette, GitBranch, HelpCircle, Terminal, Paintbrush, Activity } from "lucide-react";
 import AboutDialog from "./AboutDialog";
 import { Workspace, Icon } from "@/lib/types";
 import IconPicker, { renderIcon } from "./IconPicker";
@@ -176,6 +176,16 @@ export default function WorkspaceBar({
           title="Terminal"
         >
           <Terminal size={20} />
+        </button>
+      )}
+
+      {enabledPlugins.includes("system") && (
+        <button
+          onClick={() => onPluginClick?.("system")}
+          className="relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors text-zinc-400 hover:text-white hover:bg-zinc-700"
+          title="Resource Monitor"
+        >
+          <Activity size={20} />
         </button>
       )}
 

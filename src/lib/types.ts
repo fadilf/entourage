@@ -129,6 +129,12 @@ export type Plugin = {
   enabledByDefault: boolean;
 };
 
+export type SystemStats = {
+  cpu: { percent: number; perCore: number[]; cores: number; model: string };
+  memory: { total: number; used: number; free: number; percent: number };
+  uptime: number;
+};
+
 export type GitFileEntry = {
   path: string;
   status: "modified" | "added" | "deleted" | "renamed" | "untracked";

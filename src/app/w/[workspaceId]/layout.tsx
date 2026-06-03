@@ -13,6 +13,7 @@ import AddWorkspaceDialog from "@/components/AddWorkspaceDialog";
 import GitDialog from "@/components/GitDialog";
 import FileBrowserDialog from "@/components/FileBrowserDialog";
 import TerminalDialog from "@/components/TerminalDialog";
+import SystemMonitorDialog from "@/components/SystemMonitorDialog";
 import MobileMenuDrawer from "@/components/MobileMenuDrawer";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { WorkspaceLayoutProvider, WorkspaceLayoutContextValue } from "@/contexts/WorkspaceLayoutContext";
@@ -38,6 +39,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   const [showGitDialog, setShowGitDialog] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
+  const [showSystemMonitor, setShowSystemMonitor] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [gitChangeCount, setGitChangeCount] = useState(0);
   const [gitIsRepo, setGitIsRepo] = useState(true);
@@ -252,6 +254,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     if (pluginId === "git") setShowGitDialog(true);
     if (pluginId === "files") setShowFileBrowser(true);
     if (pluginId === "terminal") setShowTerminal(true);
+    if (pluginId === "system") setShowSystemMonitor(true);
   }, []);
 
   const handleArchiveThread = useCallback(
@@ -460,6 +463,10 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
             open={showTerminal}
             onClose={() => setShowTerminal(false)}
             workspaceId={workspaceId}
+          />
+          <SystemMonitorDialog
+            open={showSystemMonitor}
+            onClose={() => setShowSystemMonitor(false)}
           />
           {isMobile && (
             <MobileMenuDrawer

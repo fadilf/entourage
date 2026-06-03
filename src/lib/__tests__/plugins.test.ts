@@ -23,6 +23,7 @@ describe("PLUGINS", () => {
     expect(ids).toContain("git");
     expect(ids).toContain("files");
     expect(ids).toContain("terminal");
+    expect(ids).toContain("system");
   });
 
   it("all plugins are disabled by default", () => {
