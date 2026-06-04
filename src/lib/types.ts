@@ -132,6 +132,7 @@ export type Plugin = {
 export type SystemStats = {
   cpu: { percent: number; perCore: number[]; cores: number; model: string };
   memory: { total: number; used: number; free: number; percent: number };
+  disks: { mount: string; total: number; used: number; free: number; percent: number }[];
   uptime: number;
 };
 

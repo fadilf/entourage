@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Activity, Cpu, MemoryStick } from "lucide-react";
+import { Activity, Cpu, MemoryStick, HardDrive } from "lucide-react";
 import { SystemStats } from "@/lib/types";
 import Dialog from "./Dialog";
 
 const POLL_MS = 1500;
 
 function formatBytes(bytes: number): string {
+  const tb = bytes / 1024 ** 4;
+  if (tb >= 1) return `${tb.toFixed(1)} TB`;
   const gb = bytes / 1024 ** 3;
   if (gb >= 1) return `${gb.toFixed(1)} GB`;
   return `${(bytes / 1024 ** 2).toFixed(0)} MB`;
@@ -85,7 +87,7 @@ export default function SystemMonitorDialog({
         </div>
 
         {/* Body */}
-        <div className="flex flex-col gap-6 px-5 py-5">
+        <div className="flex max-h-[70vh] flex-col gap-6 overflow-y-auto px-5 py-5">
           {error && !stats ? (
             <div className="rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800">
               {error}
@@ -147,6 +149,31 @@ export default function SystemMonitorDialog({
                   {formatBytes(stats.memory.used)} / {formatBytes(stats.memory.total)} used
                 </div>
               </div>
+
+              {/* Storage */}
+              {stats.disks.length > 0 && (
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    <HardDrive className="h-4 w-4 text-zinc-400" />
+                    Storage
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    {stats.disks.map((disk) => (
+                      <div key={disk.mount}>
+                        <div className="mb-1 flex items-center justify-between text-xs">
+                          <span className="font-medium text-zinc-600 dark:text-zinc-400">
+                            {disk.mount}
+                          </span>
+                          <span className="tabular-nums text-zinc-500 dark:text-zinc-400">
+                            {formatBytes(disk.used)} / {formatBytes(disk.total)} ({disk.percent}%)
+                          </span>
+                        </div>
+                        <Meter percent={disk.percent} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

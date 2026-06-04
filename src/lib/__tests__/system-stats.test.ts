@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCpuPercents, type CpuSnapshot } from "../system-stats";
+import { computeCpuPercents, diskUsageFromStatfs, type CpuSnapshot } from "../system-stats";
 
 describe("computeCpuPercents", () => {
   it("computes busy percent from tick deltas", () => {
@@ -43,5 +43,35 @@ describe("computeCpuPercents", () => {
     // idle decreased more than total grew (counter quirk) -> clamp to 100
     const next: CpuSnapshot[] = [{ total: 1100, idle: 300 }];
     expect(computeCpuPercents(prev, next)).toEqual([100]);
+  });
+});
+
+describe("diskUsageFromStatfs", () => {
+  it("computes total/used/free bytes and percent", () => {
+    // 100 blocks of 1024 bytes = 100 KiB total, 25 blocks free -> 75% used
+    const result = diskUsageFromStatfs({ blocks: 100, bsize: 1024, bfree: 25 });
+    expect(result).toEqual({
+      total: 100 * 1024,
+      free: 25 * 1024,
+      used: 75 * 1024,
+      percent: 75,
+    });
+  });
+
+  it("reports 0% for an empty disk", () => {
+    const result = diskUsageFromStatfs({ blocks: 100, bsize: 4096, bfree: 100 });
+    expect(result.used).toBe(0);
+    expect(result.percent).toBe(0);
+  });
+
+  it("reports 100% for a full disk", () => {
+    const result = diskUsageFromStatfs({ blocks: 100, bsize: 4096, bfree: 0 });
+    expect(result.free).toBe(0);
+    expect(result.percent).toBe(100);
+  });
+
+  it("guards against a zero-block filesystem", () => {
+    const result = diskUsageFromStatfs({ blocks: 0, bsize: 4096, bfree: 0 });
+    expect(result).toEqual({ total: 0, used: 0, free: 0, percent: 0 });
   });
 });
