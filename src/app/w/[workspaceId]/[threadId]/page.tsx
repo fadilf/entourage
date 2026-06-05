@@ -64,7 +64,7 @@ export default function ThreadPage() {
     [threadId, refetchThread, refetchThreads]
   );
 
-  const { streamingMessages, isStreaming, sendMessage, stopAgent, reattach, autoDispatchPaused, resetAutoDispatch } =
+  const { streamingMessages, isStreaming, sendMessage, stopAgent, reattach, autoDispatchPaused, resetAutoDispatch, pendingWakeups, cancelWakeup, continueWakeupNow } =
     useAgentStream(threadId, handleStreamComplete, workspaceId, handleInlineSuggestions);
 
   // Re-attach to streams on mount
@@ -298,6 +298,9 @@ export default function ThreadPage() {
       onResendMessage={handleResendMessage}
       onEditMessage={handleEditMessage}
       isStreaming={isStreaming}
+      pendingWakeups={pendingWakeups}
+      onCancelWakeup={cancelWakeup}
+      onContinueWakeup={continueWakeupNow}
       allAgents={agents}
       displayName={displayName}
       userIcon={userIcon}

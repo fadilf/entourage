@@ -2,6 +2,7 @@ import { getThread, addMessage, syncThreadAgents } from "@/lib/thread-store";
 import { loadAgents } from "@/lib/agent-store";
 import { parseMentions } from "@/lib/mentions";
 import { badRequest, notFound, routeWithWorkspaceJson } from "@/lib/api-route";
+import { getProcessManager } from "@/lib/process-manager";
 import { MessageImage } from "@/lib/types";
 
 type ThreadMessageBody = {
@@ -37,17 +38,23 @@ export const POST = routeWithWorkspaceJson<{ threadId: string }, ThreadMessageBo
     const fallbackAgent = thread.agents[0] ?? allAgents[0];
 
     // TODO: re-enable coordinator routing after next release
-    // When a coordinator is set and 2+ agents are mentioned, route through coordinator only
-    let targetAgents: typeof mentionedAgents;
-    // if (mentionedAgents.length > 1 && thread.coordinatorId) {
-    //   const coordinator = mentionedAgents.find((a) => a.id === thread.coordinatorId)
-    //     ?? allAgents.find((a) => a.id === thread.coordinatorId);
-    //   targetAgents = coordinator ? [coordinator] : mentionedAgents;
-    // } else {
-      targetAgents = mentionedAgents.length > 0 ? mentionedAgents : fallbackAgent ? [fallbackAgent] : [];
-    // }
+    // When a coordinator is set and 2+ agents are mentioned, route through coordinator only:
+    //   if (mentionedAgents.length > 1 && thread.coordinatorId) {
+    //     const coordinator = mentionedAgents.find((a) => a.id === thread.coordinatorId)
+    //       ?? allAgents.find((a) => a.id === thread.coordinatorId);
+    //     targetAgents = coordinator ? [coordinator] : mentionedAgents;
+    //   }
+    const targetAgents: typeof mentionedAgents =
+      mentionedAgents.length > 0 ? mentionedAgents : fallbackAgent ? [fallbackAgent] : [];
     if (targetAgents.length === 0) {
       throw badRequest("No agents available");
+    }
+
+    // A genuine user message resets the chained-wakeup backstop and cancels any
+    // pending server-side auto-continuation for the addressed agents.
+    const pm = getProcessManager();
+    for (const a of targetAgents) {
+      pm.cancelWakeup(params.threadId, a.id);
     }
 
     const activeAgent = targetAgents[targetAgents.length - 1];

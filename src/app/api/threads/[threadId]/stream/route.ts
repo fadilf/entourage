@@ -84,7 +84,7 @@ export async function POST(
         const sub = {
           onEvents: (events: StreamEvent[]) => {
             for (const event of events) {
-              if (event.type === "content" || event.type.startsWith("tool_")) {
+              if (event.type === "content" || event.type.startsWith("tool_") || event.type === "schedule_wakeup") {
                 try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`)); } catch { /* closed */ }
               }
             }
@@ -176,7 +176,7 @@ export async function POST(
             try {
               const events = reattachParser(line + "\n");
               for (const event of events) {
-                if (event.type === "content" || event.type.startsWith("tool_")) {
+                if (event.type === "content" || event.type.startsWith("tool_") || event.type === "schedule_wakeup") {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
                 }
               }
@@ -263,6 +263,9 @@ export async function POST(
   const accumulatedToolCalls: ToolCall[] = [];
   const accumulatedBlocks: ContentBlock[] = [];
   const accumulatedDenials: PermissionDenial[] = [];
+  // Last ScheduleWakeup the model requested this turn (armed server-side on
+  // completion so the continuation fires even if the tab closes).
+  let pendingWakeup: { delaySeconds: number; prompt: string } | null = null;
   let lastPersist = Date.now();
   const parser = createStreamParser(agentModel);
 
@@ -370,6 +373,24 @@ export async function POST(
                     } catch { /* non-JSON output, skip */ }
                   }
                 }
+              } else if (event.type === "schedule_wakeup") {
+                // The model asked to be re-prompted after a delay. Record it as a
+                // content block (so it survives reload) and forward the event. A
+                // connected tab arms its own countdown and claims the wakeup to run
+                // it live; the server arms a fallback timer (below, on completion)
+                // so the continuation still fires if the tab is closed.
+                accumulatedBlocks.push({
+                  type: "schedule_wakeup",
+                  delaySeconds: event.delaySeconds,
+                  prompt: event.prompt,
+                  ...(event.reason ? { reason: event.reason } : {}),
+                });
+                pendingWakeup = { delaySeconds: event.delaySeconds, prompt: event.prompt };
+                const proc = pm.getProcess(threadId, agent.id);
+                if (proc) proc.accumulatedBlocks = accumulatedBlocks;
+                try {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+                } catch { /* Client disconnected */ }
               } else if (event.type === "permission_denials") {
                 accumulatedDenials.push(...event.denials);
                 try {
@@ -437,6 +458,13 @@ export async function POST(
               ...(inlineSuggestions.length > 0 ? { suggestions: inlineSuggestions } : {}),
               ...(accumulatedDenials.length > 0 ? { permissionDenials: accumulatedDenials } : {}),
             }).catch(() => {});
+
+            // Arm the server-side fallback wakeup timer so the continuation fires
+            // even if the tab closes before its delay elapses. A connected client
+            // claims this (cancelling the timer) and runs the turn live instead.
+            if (status === "complete" && pendingWakeup) {
+              pm.scheduleWakeup(workspaceDir, threadId, agent.id, pendingWakeup.delaySeconds * 1000, pendingWakeup.prompt);
+            }
 
             try {
               if (inlineSuggestions.length > 0) {

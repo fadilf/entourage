@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Agent, MessageImage, ToolCall, ContentBlock, PermissionDenial } from "@/lib/types";
+import { Agent, MessageImage, ToolCall, ContentBlock, PermissionDenial, PendingWakeup } from "@/lib/types";
 
 type StreamingMessage = {
   agentId: string;
@@ -11,6 +11,13 @@ type StreamingMessage = {
   permissionDenials?: PermissionDenial[];
   isReattach?: boolean;
 };
+
+type PendingWakeupInternal = PendingWakeup & { timer?: ReturnType<typeof setTimeout> };
+
+// Safety cap: stop auto-firing ScheduleWakeup continuations after this many
+// consecutive chained wakeups (without an intervening manual message) so a model
+// can't self-loop forever. The user can still continue manually past the cap.
+const MAX_CHAINED_WAKEUPS = 20;
 
 export function useAgentStream(
   threadId: string | null,
@@ -29,6 +36,10 @@ export function useAgentStream(
   // mirrors how the CLI queues messages typed while it's working.
   const agentChains = useRef<Map<string, Promise<void>>>(new Map());
   const autoDispatchCounters = useRef<Map<string, number>>(new Map());
+  // Pending ScheduleWakeup continuations, keyed by threadId then agentId, plus a
+  // per-(thread,agent) counter of consecutive auto-fires for the safety cap.
+  const allWakeups = useRef<Map<string, Map<string, PendingWakeupInternal>>>(new Map());
+  const wakeupCounters = useRef<Map<string, number>>(new Map());
   const [autoDispatchPaused, setAutoDispatchPaused] = useState(false);
   const [, setRenderTick] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +56,116 @@ export function useAgentStream(
 
   const triggerRender = useCallback(() => setRenderTick((t) => t + 1), []);
 
+  // --- ScheduleWakeup auto-continuation ---
+
+  /**
+   * Coordinate a wakeup with the server's authoritative timer.
+   * - "claim": take over a pending wakeup to run it live. Resolves true if we
+   *   should proceed locally; false means the server already fired it headlessly.
+   * - "cancel": drop the server timer (user dismissed / took over / stopped).
+   * Best-effort: on a network error we proceed locally rather than stall.
+   */
+  const postWakeup = useCallback(
+    (tid: string, agentId: string, action: "claim" | "cancel"): Promise<boolean> => {
+      const q = workspaceIdRef.current ? `?workspaceId=${workspaceIdRef.current}` : "";
+      return fetch(`/api/threads/${tid}/wakeup${q}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId, action }),
+      })
+        .then((r) => r.json())
+        .then((d) => (action === "claim" ? d?.claimed !== false : true))
+        .catch(() => true);
+    },
+    []
+  );
+
+  /** Clear a pending wakeup's timer and drop it from the map (no re-render). */
+  const clearWakeupTimer = useCallback((tid: string, agentId: string) => {
+    const m = allWakeups.current.get(tid);
+    const w = m?.get(agentId);
+    if (w?.timer) clearTimeout(w.timer);
+    if (m) {
+      m.delete(agentId);
+      if (m.size === 0) allWakeups.current.delete(tid);
+    }
+  }, []);
+
+  /** Fire a due wakeup: claim it from the server, then re-submit live. */
+  const fireWakeup = useCallback(
+    (tid: string, agentId: string) => {
+      const w = allWakeups.current.get(tid)?.get(agentId);
+      if (!w) return;
+      const { prompt } = w;
+      clearWakeupTimer(tid, agentId);
+      const ck = `${tid}:${agentId}`;
+      wakeupCounters.current.set(ck, (wakeupCounters.current.get(ck) ?? 0) + 1);
+      triggerRender();
+      // Claim from the server so its fallback timer doesn't also fire. If the
+      // server already fired headlessly (claimed === false), don't double-run —
+      // the new streaming message will be picked up on reattach.
+      void postWakeup(tid, agentId, "claim").then((proceed) => {
+        if (proceed) streamAgentRef.current?.(tid, agentId, prompt);
+      });
+    },
+    [clearWakeupTimer, triggerRender, postWakeup]
+  );
+
+  /** Register a wakeup requested by the model's ScheduleWakeup tool. */
+  const scheduleWakeup = useCallback(
+    (tid: string, agentId: string, delaySeconds: number, prompt: string, reason?: string) => {
+      clearWakeupTimer(tid, agentId); // replace any prior pending wakeup
+      if (!allWakeups.current.has(tid)) allWakeups.current.set(tid, new Map());
+      const slot = allWakeups.current.get(tid)!;
+      const ck = `${tid}:${agentId}`;
+      const count = wakeupCounters.current.get(ck) ?? 0;
+      if (count >= MAX_CHAINED_WAKEUPS) {
+        // Cap hit — keep it visible but require a manual "continue".
+        slot.set(agentId, { agentId, prompt, reason, fireAt: null, capped: true });
+        triggerRender();
+        return;
+      }
+      const delayMs = Math.max(1, Math.min(3600, delaySeconds || 60)) * 1000;
+      const timer = setTimeout(() => fireWakeup(tid, agentId), delayMs);
+      slot.set(agentId, { agentId, prompt, reason, fireAt: Date.now() + delayMs, timer });
+      triggerRender();
+    },
+    [clearWakeupTimer, fireWakeup, triggerRender]
+  );
+
+  /** Cancel a scheduled wakeup (user dismissed it), server-side included. */
+  const cancelWakeup = useCallback(
+    (agentId: string) => {
+      const tid = threadIdRef.current;
+      if (!tid) return;
+      clearWakeupTimer(tid, agentId);
+      void postWakeup(tid, agentId, "cancel");
+      triggerRender();
+    },
+    [clearWakeupTimer, triggerRender, postWakeup]
+  );
+
+  /** Continue now: fire a wakeup immediately, resetting the chained-wakeup cap. */
+  const continueWakeupNow = useCallback(
+    (agentId: string) => {
+      const tid = threadIdRef.current;
+      if (!tid) return;
+      const w = allWakeups.current.get(tid)?.get(agentId);
+      if (!w) return;
+      wakeupCounters.current.set(`${tid}:${agentId}`, 0);
+      const { prompt } = w;
+      clearWakeupTimer(tid, agentId);
+      triggerRender();
+      // Cancel the server's pending fallback and reset its chain budget (this is a
+      // deliberate manual continue), then run the turn live. Its completion arms a
+      // fresh server timer from zero, so tab-closed firing resumes afterwards.
+      void postWakeup(tid, agentId, "cancel").then(() => {
+        streamAgentRef.current?.(tid, agentId, prompt);
+      });
+    },
+    [clearWakeupTimer, triggerRender, postWakeup]
+  );
+
   const wsParam = useCallback(() => {
     const id = workspaceIdRef.current;
     return id ? `?workspaceId=${id}` : "";
@@ -56,6 +177,12 @@ export function useAgentStream(
     ? allStreams.current.get(threadId) ?? emptyMap
     : emptyMap;
   const isStreaming = streamingMessages.size > 0;
+
+  // Expose the current thread's pending ScheduleWakeup continuations.
+  const emptyWakeups = useRef(new Map<string, PendingWakeup>()).current;
+  const pendingWakeups: Map<string, PendingWakeup> = threadId
+    ? allWakeups.current.get(threadId) ?? emptyWakeups
+    : emptyWakeups;
 
   // --- Shared SSE event processing ---
 
@@ -163,6 +290,16 @@ export function useAgentStream(
           triggerRender();
           break;
         }
+        case "schedule_wakeup": {
+          // Show the wakeup inline in the current turn, and arm the timer that
+          // re-prompts the agent once it elapses (survives stream cleanup).
+          const blocks = [...(existing?.contentBlocks ?? [])];
+          blocks.push({ type: "schedule_wakeup", delaySeconds: event.delaySeconds, prompt: event.prompt, ...(event.reason ? { reason: event.reason } : {}) });
+          threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", contentBlocks: blocks });
+          scheduleWakeup(tid, agentId, event.delaySeconds, event.prompt, event.reason);
+          triggerRender();
+          break;
+        }
         case "suggestions": {
           if (tid === threadIdRef.current) {
             onSuggestionsRef.current?.(event.suggestions);
@@ -191,7 +328,7 @@ export function useAgentStream(
       }
       return null;
     },
-    [triggerRender]
+    [triggerRender, scheduleWakeup]
   );
 
   /** Read an SSE response body, dispatching parsed events to handleEvent. Returns done status. */
@@ -256,9 +393,15 @@ export function useAgentStream(
   // This lets the server detect clientDisconnected and mark the thread as unread.
   useEffect(() => {
     const controllers = abortControllers.current;
+    const wakeups = allWakeups.current;
     return () => {
       for (const controller of controllers.values()) {
         controller.abort();
+      }
+      for (const slot of wakeups.values()) {
+        for (const w of slot.values()) {
+          if (w.timer) clearTimeout(w.timer);
+        }
       }
     };
   }, []);
@@ -348,18 +491,30 @@ export function useAgentStream(
       const currentThreadId = threadId;
       setError(null);
 
+      // A manual message means the user took over: cancel any pending auto-wakeup
+      // for these agents (server-side too) and reset their chained-wakeup budget.
+      for (const agent of targetAgents) {
+        clearWakeupTimer(currentThreadId, agent.id);
+        wakeupCounters.current.set(`${currentThreadId}:${agent.id}`, 0);
+        void postWakeup(currentThreadId, agent.id, "cancel");
+      }
+
       await Promise.all(
         targetAgents.map((agent) =>
           streamAgent(currentThreadId, agent.id, content, images, attachedThreadIds)
         )
       );
     },
-    [threadId, streamAgent]
+    [threadId, streamAgent, clearWakeupTimer, postWakeup]
   );
 
   const stopAgent = useCallback(
     async (agentId: string) => {
       if (!threadId) return;
+      // Stopping an agent also cancels any wakeup it had armed (server-side too).
+      clearWakeupTimer(threadId, agentId);
+      void postWakeup(threadId, agentId, "cancel");
+      triggerRender();
       const controllerKey = `${threadId}:${agentId}`;
       abortControllers.current.get(controllerKey)?.abort();
       await fetch(`/api/threads/${threadId}/stop${wsParam()}`, {
@@ -368,7 +523,7 @@ export function useAgentStream(
         body: JSON.stringify({ agentId }),
       });
     },
-    [threadId, wsParam]
+    [threadId, wsParam, clearWakeupTimer, triggerRender, postWakeup]
   );
 
   const reattach = useCallback(
@@ -433,5 +588,8 @@ export function useAgentStream(
     reattach,
     autoDispatchPaused,
     resetAutoDispatch,
+    pendingWakeups,
+    cancelWakeup,
+    continueWakeupNow,
   };
 }

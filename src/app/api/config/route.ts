@@ -1,4 +1,4 @@
-import { loadAgents, loadDefaultCliModels, loadDisplayName, loadUserIcon, loadUserColor, saveDefaultCliModels, saveDisplayName, saveUserIcon, saveUserColor, loadPlugins, savePlugins, loadQuickReplies, saveQuickReplies, loadToolCallGrouping, saveToolCallGrouping } from "@/lib/agent-store";
+import { loadAgents, loadDefaultCliModels, loadDisplayName, loadUserIcon, loadUserColor, saveDefaultCliModels, saveDisplayName, saveUserIcon, saveUserColor, loadPlugins, savePlugins, loadQuickReplies, saveQuickReplies, loadToolCallGrouping, saveToolCallGrouping, loadTts, saveTts, type TtsConfig } from "@/lib/agent-store";
 import { route, routeWithJson } from "@/lib/api-route";
 import type { CliModelDefaults, Icon } from "@/lib/types";
 
@@ -10,10 +10,11 @@ type ConfigBody = {
   toolCallGroupingEnabled?: boolean;
   userIcon?: Icon | null;
   userColor?: string;
+  tts?: Partial<TtsConfig>;
 };
 
 export const GET = route(async () => {
-  const [agents, displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor] = await Promise.all([
+  const [agents, displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor, tts] = await Promise.all([
     loadAgents(),
     loadDisplayName(),
     loadDefaultCliModels(),
@@ -22,8 +23,9 @@ export const GET = route(async () => {
     loadToolCallGrouping(),
     loadUserIcon(),
     loadUserColor(),
+    loadTts(),
   ]);
-  return { agents, displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor };
+  return { agents, displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor, tts };
 });
 
 export const PATCH = routeWithJson<Record<string, never>, ConfigBody>(async ({ body }) => {
@@ -55,7 +57,11 @@ export const PATCH = routeWithJson<Record<string, never>, ConfigBody>(async ({ b
     await saveUserColor(body.userColor);
   }
 
-  const [displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor] = await Promise.all([
+  if (body.tts && typeof body.tts === "object") {
+    await saveTts(body.tts);
+  }
+
+  const [displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor, tts] = await Promise.all([
     loadDisplayName(),
     loadDefaultCliModels(),
     loadPlugins(),
@@ -63,6 +69,7 @@ export const PATCH = routeWithJson<Record<string, never>, ConfigBody>(async ({ b
     loadToolCallGrouping(),
     loadUserIcon(),
     loadUserColor(),
+    loadTts(),
   ]);
-  return { displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor };
+  return { displayName, defaultCliModels, plugins, quickReplies, toolCallGrouping, userIcon, userColor, tts };
 });

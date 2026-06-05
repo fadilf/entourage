@@ -61,7 +61,22 @@ export type ToolCall = {
 export type ContentBlock =
   | { type: "text"; text: string }
   | { type: "tool_call"; toolCall: ToolCall }
-  | { type: "mcp_app"; toolName: string; serverId: string; toolInput?: Record<string, unknown>; toolResult?: Record<string, unknown>; html?: string };
+  | { type: "mcp_app"; toolName: string; serverId: string; toolInput?: Record<string, unknown>; toolResult?: Record<string, unknown>; html?: string }
+  | { type: "schedule_wakeup"; delaySeconds: number; prompt: string; reason?: string };
+
+/**
+ * A scheduled auto-continuation produced by the model's ScheduleWakeup tool.
+ * The agent will be re-prompted with `prompt` once the timer elapses. `fireAt`
+ * is the epoch-ms deadline, or null when the chained-wakeup cap was hit and a
+ * manual "continue" is required instead.
+ */
+export type PendingWakeup = {
+  agentId: string;
+  prompt: string;
+  reason?: string;
+  fireAt: number | null;
+  capped?: boolean;
+};
 
 export type McpServerConfig = {
   id: string;

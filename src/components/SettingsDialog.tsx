@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Agent, AgentModel, Icon, PermissionLevel } from "@/lib/types";
 import Dialog from "./Dialog";
 import { useTheme } from "next-themes";
 import { useWorkspaceId } from "@/contexts/WorkspaceContext";
 import AgentFormPanel from "./settings-dialog/AgentFormPanel";
 import AgentProfilesPanel from "./settings-dialog/AgentProfilesPanel";
-import GeneralSettingsPanel from "./settings-dialog/GeneralSettingsPanel";
+import GeneralSettingsPanel, { type InstallState, type PiperStatus } from "./settings-dialog/GeneralSettingsPanel";
 import McpServersPanel from "./settings-dialog/McpServersPanel";
 import PluginsPanel from "./settings-dialog/PluginsPanel";
 import SettingsDialogHeader from "./settings-dialog/SettingsDialogHeader";
+import { refreshTtsConfig, type TtsConfig, type TtsEngine } from "@/lib/tts";
 import {
   EMPTY_AGENT_FORM,
   type AgentFormData,
@@ -18,6 +19,36 @@ import {
   type McpServer,
   type Tab,
 } from "./settings-dialog/types";
+
+const DEFAULT_TTS: TtsConfig = { engine: "web" };
+
+type InstallEvent =
+  | { stage: "download-binary"; bytesReceived: number; bytesTotal: number }
+  | { stage: "verify-binary" }
+  | { stage: "extract" }
+  | { stage: "download-voice"; voiceId: string; file: "onnx" | "json"; bytesReceived: number; bytesTotal: number }
+  | { stage: "verify-voice"; voiceId: string }
+  | { stage: "done" }
+  | { stage: "error"; message: string };
+
+function installEventToState(event: InstallEvent): InstallState | null {
+  switch (event.stage) {
+    case "download-binary":
+      return { status: "installing", stage: event.stage, label: "Downloading Piper binary…", bytesReceived: event.bytesReceived, bytesTotal: event.bytesTotal };
+    case "verify-binary":
+      return { status: "installing", stage: event.stage, label: "Verifying binary…" };
+    case "extract":
+      return { status: "installing", stage: event.stage, label: "Extracting…" };
+    case "download-voice":
+      return { status: "installing", stage: event.stage, label: `Downloading voice (${event.file})…`, bytesReceived: event.bytesReceived, bytesTotal: event.bytesTotal };
+    case "verify-voice":
+      return { status: "installing", stage: event.stage, label: "Verifying voice…" };
+    case "done":
+      return null;
+    case "error":
+      return { status: "error", message: event.message };
+  }
+}
 
 const EMPTY_DEFAULT_CLI_MODELS: Record<AgentModel, string> = {
   claude: "",
@@ -64,6 +95,10 @@ export default function SettingsDialog({
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const workspaceId = useWorkspaceId();
   const [wsPermissionLevel, setWsPermissionLevel] = useState<PermissionLevel>("full");
+  const [ttsConfig, setTtsConfig] = useState<TtsConfig>(DEFAULT_TTS);
+  const [piperStatus, setPiperStatus] = useState<PiperStatus | null>(null);
+  const [installState, setInstallState] = useState<InstallState>({ status: "idle" });
+  const installAbortRef = useRef<AbortController | null>(null);
 
   const patchConfig = useCallback(async (body: Record<string, unknown>) => {
     return fetch("/api/config", {
@@ -108,6 +143,20 @@ export default function SettingsDialog({
       }
       setUserColor(data.userColor || "#7c3aed");
       setSavedUserColor(data.userColor || "#7c3aed");
+      const nextTts: TtsConfig = data.tts && typeof data.tts === "object"
+        ? { engine: data.tts.engine === "piper" ? "piper" : "web", piperVoice: data.tts.piperVoice }
+        : DEFAULT_TTS;
+      setTtsConfig(nextTts);
+      refreshTtsConfig(nextTts);
+    }
+  }, []);
+
+  const fetchPiperStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/tts/status");
+      if (res.ok) setPiperStatus(await res.json());
+    } catch {
+      // ignore
     }
   }, []);
 
@@ -127,8 +176,9 @@ export default function SettingsDialog({
       fetchConfig();
       fetchMcpServers();
       fetchWorkspacePermission();
+      fetchPiperStatus();
     }
-  }, [open, fetchAgents, fetchConfig, fetchMcpServers, fetchWorkspacePermission]);
+  }, [open, fetchAgents, fetchConfig, fetchMcpServers, fetchWorkspacePermission, fetchPiperStatus]);
 
   const handleSaveDisplayName = async () => {
     const res = await patchConfig({ displayName });
@@ -303,6 +353,87 @@ export default function SettingsDialog({
     await patchConfig({ plugins: updated });
   };
 
+  const persistTtsConfig = useCallback(async (next: TtsConfig) => {
+    setTtsConfig(next);
+    refreshTtsConfig(next);
+    await patchConfig({ tts: next });
+  }, [patchConfig]);
+
+  const handleTtsEngineChange = useCallback(async (engine: TtsEngine) => {
+    const next: TtsConfig = engine === "piper"
+      ? { engine: "piper", piperVoice: ttsConfig.piperVoice ?? piperStatus?.defaultVoice ?? "en_US-norman-medium" }
+      : { engine: "web" };
+    await persistTtsConfig(next);
+  }, [ttsConfig.piperVoice, piperStatus?.defaultVoice, persistTtsConfig]);
+
+  const handleInstallPiper = useCallback(async () => {
+    const voiceId = ttsConfig.piperVoice ?? piperStatus?.defaultVoice ?? "en_US-norman-medium";
+    const abort = new AbortController();
+    installAbortRef.current = abort;
+    setInstallState({ status: "installing", stage: "download-binary", label: "Starting…" });
+
+    try {
+      const res = await fetch("/api/tts/install", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voiceId }),
+        signal: abort.signal,
+      });
+      if (!res.ok || !res.body) {
+        setInstallState({ status: "error", message: `Install failed: ${res.status}` });
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let lastError: string | null = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line) as InstallEvent;
+            const nextState = installEventToState(event);
+            if (event.stage === "error") lastError = event.message;
+            if (nextState) setInstallState(nextState);
+          } catch {
+            // skip malformed line
+          }
+        }
+      }
+
+      if (lastError) {
+        setInstallState({ status: "error", message: lastError });
+      } else {
+        setInstallState({ status: "idle" });
+        await fetchPiperStatus();
+      }
+    } catch (err) {
+      if ((err as { name?: string })?.name === "AbortError") {
+        setInstallState({ status: "idle" });
+      } else {
+        setInstallState({ status: "error", message: err instanceof Error ? err.message : String(err) });
+      }
+    } finally {
+      installAbortRef.current = null;
+    }
+  }, [ttsConfig.piperVoice, piperStatus?.defaultVoice, fetchPiperStatus]);
+
+  const handleCancelInstallPiper = useCallback(() => {
+    installAbortRef.current?.abort();
+    installAbortRef.current = null;
+    setInstallState({ status: "idle" });
+  }, []);
+
+  const handleCloseInstallDialog = useCallback(() => {
+    setInstallState({ status: "idle" });
+  }, []);
+
   const handleAddMcpServer = async (server: CreateMcpServerInput) => {
     await fetch("/api/mcp-servers", {
       method: "POST",
@@ -360,6 +491,13 @@ export default function SettingsDialog({
             onToggleQuickReplies={handleToggleQuickReplies}
             onToggleToolCallGrouping={handleToggleToolCallGrouping}
             onPermissionLevelChange={handlePermissionLevelChange}
+            ttsConfig={ttsConfig}
+            piperStatus={piperStatus}
+            installState={installState}
+            onTtsEngineChange={handleTtsEngineChange}
+            onInstallPiper={handleInstallPiper}
+            onCancelInstallPiper={handleCancelInstallPiper}
+            onCloseInstallDialog={handleCloseInstallDialog}
           />
         );
       case "agents":

@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ThreadWithMessages, Agent, Message, MessageImage, Icon, PermissionLevel, ThreadListItem } from "@/lib/types";
+import { ThreadWithMessages, Agent, Message, MessageImage, Icon, PermissionLevel, ThreadListItem, PendingWakeup } from "@/lib/types";
 import { ChevronLeft, Copy, Pencil, RotateCcw, Send, ShieldCheck, ShieldAlert, Shield, RefreshCw, Repeat, Volume2, VolumeX } from "lucide-react";
 import Dialog from "./Dialog";
 import MessageList from "./MessageList";
+import WakeupIndicator from "./WakeupIndicator";
 import MessageInput from "./MessageInput";
 import QuickReplies from "./QuickReplies";
 import ContextMenu from "./ContextMenu";
@@ -38,6 +39,9 @@ export default function ThreadDetail({
   onChangeMaxAutoDispatches,
   autoDispatchPaused,
   onResumeAutoDispatch,
+  pendingWakeups,
+  onCancelWakeup,
+  onContinueWakeup,
 }: {
   thread: ThreadWithMessages | null;
   streamingMessages: Map<string, { agentId: string; content: string; toolCalls?: import("@/lib/types").ToolCall[]; contentBlocks?: import("@/lib/types").ContentBlock[]; isReattach?: boolean }>;
@@ -66,6 +70,9 @@ export default function ThreadDetail({
   onChangeMaxAutoDispatches?: (limit: number) => void;
   autoDispatchPaused?: boolean;
   onResumeAutoDispatch?: () => void;
+  pendingWakeups?: Map<string, PendingWakeup>;
+  onCancelWakeup?: (agentId: string) => void;
+  onContinueWakeup?: (agentId: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
@@ -371,6 +378,17 @@ export default function ThreadDetail({
           </button>
         </div>
       )}
+      {/* Scheduled wakeup (auto-continuation) banners */}
+      {pendingWakeups && Array.from(pendingWakeups.values()).map((w) => (
+        <WakeupIndicator
+          key={w.agentId}
+          agentName={thread.agents.find((a) => a.id === w.agentId)?.name ?? "agent"}
+          fireAt={w.fireAt}
+          reason={w.reason}
+          onCancel={() => onCancelWakeup?.(w.agentId)}
+          onContinue={() => onContinueWakeup?.(w.agentId)}
+        />
+      ))}
       <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto pt-3 pb-2">
         <MessageList
           messages={allMessages}

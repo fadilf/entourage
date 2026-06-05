@@ -8,6 +8,8 @@ import { createWriteLock } from "./write-lock";
 
 type QuickRepliesConfig = { enabled: boolean };
 type ToolCallGroupingConfig = { enabled: boolean };
+export type TtsEngine = "web" | "piper";
+export type TtsConfig = { engine: TtsEngine; piperVoice?: string };
 type Config = {
   agents: Agent[];
   displayName?: string;
@@ -17,6 +19,7 @@ type Config = {
   quickReplies?: QuickRepliesConfig;
   toolCallGrouping?: ToolCallGroupingConfig;
   defaultCliModels?: CliModelDefaults;
+  tts?: TtsConfig;
 };
 
 const GLOBAL_CONFIG_DIR = path.join(os.homedir(), ".entourage");
@@ -223,6 +226,29 @@ export async function saveToolCallGrouping(toolCallGrouping: Partial<ToolCallGro
   const config = await loadConfig();
   const current = config.toolCallGrouping ?? { enabled: true };
   await saveConfig({ ...config, toolCallGrouping: { ...current, ...toolCallGrouping } });
+}
+
+const DEFAULT_TTS: TtsConfig = { engine: "web" };
+
+function sanitizeTts(value: unknown): TtsConfig {
+  if (!value || typeof value !== "object") return DEFAULT_TTS;
+  const v = value as Partial<TtsConfig>;
+  const engine: TtsEngine = v.engine === "piper" ? "piper" : "web";
+  const piperVoice = typeof v.piperVoice === "string" && v.piperVoice.trim() ? v.piperVoice.trim() : undefined;
+  return { engine, ...(piperVoice ? { piperVoice } : {}) };
+}
+
+export async function loadTts(): Promise<TtsConfig> {
+  const config = await loadConfig();
+  return sanitizeTts(config.tts);
+}
+
+export async function saveTts(tts: Partial<TtsConfig>): Promise<TtsConfig> {
+  const config = await loadConfig();
+  const current = sanitizeTts(config.tts);
+  const next = sanitizeTts({ ...current, ...tts });
+  await saveConfig({ ...config, tts: next });
+  return next;
 }
 
 function validateAgentName(name: string): void {

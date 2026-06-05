@@ -4,6 +4,7 @@ export type StreamEvent =
   | { type: "content"; text: string }
   | { type: "tool_start"; toolId: string; toolName: string; input?: string }
   | { type: "tool_result"; toolId: string; output: string }
+  | { type: "schedule_wakeup"; delaySeconds: number; prompt: string; reason?: string }
   | { type: "done"; status: "complete" | "error" }
   | { type: "error"; message: string }
   | { type: "permission_denials"; denials: { toolName: string; toolInput?: Record<string, unknown> }[] };
@@ -135,7 +136,15 @@ function extractClaudeToolEvents(json: Record<string, unknown>): StreamEvent[] {
   if (json.type === "assistant") {
     for (const block of contentArray) {
       const b = block as Record<string, unknown>;
-      if (b.type === "tool_use" && typeof b.id === "string" && typeof b.name === "string") {
+      if (b.type !== "tool_use" || typeof b.name !== "string") continue;
+      // ScheduleWakeup is surfaced as a dedicated event (drives the auto-continue
+      // timer + countdown UI) rather than a generic tool block.
+      if (b.name === "ScheduleWakeup") {
+        const wakeup = extractScheduleWakeup(b.input);
+        if (wakeup) events.push(wakeup);
+        continue;
+      }
+      if (typeof b.id === "string") {
         const input = b.input ? JSON.stringify(b.input) : undefined;
         events.push({ type: "tool_start", toolId: b.id, toolName: b.name, input });
       }
@@ -154,6 +163,20 @@ function extractClaudeToolEvents(json: Record<string, unknown>): StreamEvent[] {
   }
 
   return events;
+}
+
+/**
+ * Parse the input of a `ScheduleWakeup` tool call into a schedule_wakeup event.
+ * `delaySeconds` is clamped to the tool's documented [60, 3600] range (defaulting
+ * to 60 when missing/invalid). Returns null only if there is no usable input.
+ */
+function extractScheduleWakeup(rawInput: unknown): Extract<StreamEvent, { type: "schedule_wakeup" }> | null {
+  const input = (rawInput ?? {}) as Record<string, unknown>;
+  const rawDelay = typeof input.delaySeconds === "number" ? input.delaySeconds : 60;
+  const delaySeconds = Math.min(3600, Math.max(60, Math.round(rawDelay) || 60));
+  const prompt = typeof input.prompt === "string" ? input.prompt : "";
+  const reason = typeof input.reason === "string" ? input.reason : undefined;
+  return { type: "schedule_wakeup", delaySeconds, prompt, ...(reason ? { reason } : {}) };
 }
 
 function extractText(json: Record<string, unknown>, model: AgentModel): string | null {

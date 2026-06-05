@@ -1,10 +1,33 @@
 "use client";
 
+import { useState } from "react";
 import type { AgentModel, Icon, PermissionLevel } from "@/lib/types";
-import { Moon, Sun, X } from "lucide-react";
+import type { TtsEngine, TtsConfig } from "@/lib/tts";
+import { speak as ttsSpeak, stop as ttsStop } from "@/lib/tts";
+import { Download, Moon, Play, Sun, X } from "lucide-react";
+import Dialog from "../Dialog";
 import SettingsToggle from "./SettingsToggle";
 import { COLOR_PRESETS, PERMISSION_LEVELS } from "./types";
 import IconPicker, { renderIcon } from "../IconPicker";
+
+export type PiperStatus = {
+  binaryInstalled: boolean;
+  installedVoices: string[];
+  availableVoices: string[];
+  defaultVoice: string;
+};
+
+export type InstallState =
+  | { status: "idle" }
+  | { status: "installing"; stage: string; label: string; bytesReceived?: number; bytesTotal?: number }
+  | { status: "error"; message: string };
+
+function formatBytes(n?: number): string {
+  if (!n || !Number.isFinite(n)) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
 
 const DEFAULT_MODEL_FIELDS: ReadonlyArray<{
   model: AgentModel;
@@ -29,6 +52,9 @@ type GeneralSettingsPanelProps = {
   userColor: string;
   savedUserIcon?: Icon;
   savedUserColor: string;
+  ttsConfig: TtsConfig;
+  piperStatus: PiperStatus | null;
+  installState: InstallState;
   onUserIconChange: (icon: Icon | null) => void;
   onUserColorChange: (color: string) => void;
   onSaveUserProfile: () => void | Promise<void>;
@@ -40,6 +66,10 @@ type GeneralSettingsPanelProps = {
   onToggleQuickReplies: () => void | Promise<void>;
   onToggleToolCallGrouping: () => void | Promise<void>;
   onPermissionLevelChange: (value: PermissionLevel) => void | Promise<void>;
+  onTtsEngineChange: (engine: TtsEngine) => void | Promise<void>;
+  onInstallPiper: () => void | Promise<void>;
+  onCancelInstallPiper: () => void;
+  onCloseInstallDialog: () => void;
 };
 
 export default function GeneralSettingsPanel({
@@ -67,10 +97,38 @@ export default function GeneralSettingsPanel({
   onToggleQuickReplies,
   onToggleToolCallGrouping,
   onPermissionLevelChange,
+  ttsConfig,
+  piperStatus,
+  installState,
+  onTtsEngineChange,
+  onInstallPiper,
+  onCancelInstallPiper,
+  onCloseInstallDialog,
 }: GeneralSettingsPanelProps) {
   const hasDefaultCliModelChanges = DEFAULT_MODEL_FIELDS.some(
     ({ model }) => defaultCliModels[model] !== savedDefaultCliModels[model]
   );
+
+  const [testStatus, setTestStatus] = useState<"idle" | "playing" | "error">("idle");
+  const piperReady =
+    !!piperStatus && piperStatus.binaryInstalled && piperStatus.installedVoices.length > 0;
+  const piperVoice = ttsConfig.piperVoice ?? piperStatus?.defaultVoice ?? "en_US-norman-medium";
+
+  const handleTestVoice = async () => {
+    setTestStatus("playing");
+    try {
+      await ttsSpeak("__tts_test__", "Hello. This is a test of the text-to-speech voice.");
+      setTimeout(() => setTestStatus("idle"), 3500);
+    } catch {
+      setTestStatus("error");
+      setTimeout(() => setTestStatus("idle"), 3500);
+    }
+  };
+
+  const handleStopTest = () => {
+    ttsStop();
+    setTestStatus("idle");
+  };
 
   return (
     <div className="space-y-6">
@@ -170,6 +228,104 @@ export default function GeneralSettingsPanel({
             enableUpload
           />
         </div>
+      </div>
+
+      <div className="px-3 py-2.5">
+        <div className="mb-2">
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Voice</span>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">
+            Used by &quot;Read aloud&quot; in the message context menu
+          </p>
+        </div>
+        <div className="space-y-1">
+          <button
+            onClick={() => onTtsEngineChange("web")}
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
+              ttsConfig.engine === "web"
+                ? "bg-zinc-100 ring-1 ring-zinc-300 dark:bg-zinc-700 dark:ring-zinc-600"
+                : "hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <div className={`text-sm ${ttsConfig.engine === "web" ? "font-semibold text-zinc-900 dark:text-zinc-100" : "font-medium text-zinc-700 dark:text-zinc-300"}`}>
+                Browser default
+              </div>
+              <div className="text-xs text-zinc-400 dark:text-zinc-500">
+                Uses your browser&apos;s built-in voice. Always available.
+              </div>
+            </div>
+            {ttsConfig.engine === "web" && (
+              <span className="text-violet-600 dark:text-violet-400">&#10003;</span>
+            )}
+          </button>
+          <button
+            onClick={() => onTtsEngineChange("piper")}
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
+              ttsConfig.engine === "piper"
+                ? "bg-zinc-100 ring-1 ring-zinc-300 dark:bg-zinc-700 dark:ring-zinc-600"
+                : "hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <div className={`text-sm ${ttsConfig.engine === "piper" ? "font-semibold text-zinc-900 dark:text-zinc-100" : "font-medium text-zinc-700 dark:text-zinc-300"}`}>
+                Local (Piper)
+              </div>
+              <div className="text-xs text-zinc-400 dark:text-zinc-500">
+                Higher quality, runs offline on your machine. Needs a one-time ~90 MB download.
+              </div>
+            </div>
+            {ttsConfig.engine === "piper" && (
+              <span className="text-violet-600 dark:text-violet-400">&#10003;</span>
+            )}
+          </button>
+        </div>
+
+        {ttsConfig.engine === "piper" && (
+          <div className="mt-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+            {!piperReady ? (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Piper is not installed</div>
+                  <div className="text-xs text-zinc-400 dark:text-zinc-500">
+                    Downloads the Piper binary and the default voice ({piperVoice}).
+                  </div>
+                </div>
+                <button
+                  onClick={onInstallPiper}
+                  disabled={installState.status === "installing"}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Install
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Voice</div>
+                  <div className="text-xs text-zinc-400 dark:text-zinc-500 font-mono">{piperVoice}</div>
+                </div>
+                {testStatus === "playing" ? (
+                  <button
+                    onClick={handleStopTest}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Stop
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleTestVoice}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                    {testStatus === "error" ? "Test failed — retry" : "Test voice"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between px-3 py-2.5">
@@ -304,6 +460,78 @@ export default function GeneralSettingsPanel({
           ))}
         </div>
       </div>
+
+      <PiperInstallDialog
+        installState={installState}
+        onCancel={onCancelInstallPiper}
+        onClose={onCloseInstallDialog}
+      />
     </div>
+  );
+}
+
+function PiperInstallDialog({
+  installState,
+  onCancel,
+  onClose,
+}: {
+  installState: InstallState;
+  onCancel: () => void;
+  onClose: () => void;
+}) {
+  const open = installState.status !== "idle";
+  const isInstalling = installState.status === "installing";
+  const isError = installState.status === "error";
+
+  let pct: number | null = null;
+  if (isInstalling && installState.bytesTotal && installState.bytesTotal > 0 && installState.bytesReceived !== undefined) {
+    pct = Math.min(100, Math.round((installState.bytesReceived / installState.bytesTotal) * 100));
+  }
+
+  return (
+    <Dialog open={open} onClose={isInstalling ? () => {} : onClose}>
+      <div className="mx-4 w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6 shadow-xl">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          {isError ? "Install failed" : "Installing Piper"}
+        </h3>
+        {isInstalling && (
+          <>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{installState.label}</p>
+            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700">
+              <div
+                className="h-full rounded-full bg-violet-600 transition-all"
+                style={{ width: pct !== null ? `${pct}%` : "100%", opacity: pct === null ? 0.5 : 1 }}
+              />
+            </div>
+            {(installState.bytesTotal ?? 0) > 0 && (
+              <p className="mt-1 text-right text-xs text-zinc-400 dark:text-zinc-500">
+                {formatBytes(installState.bytesReceived)} / {formatBytes(installState.bytesTotal)}
+              </p>
+            )}
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={onCancel}
+                className="rounded-lg px-3 py-1.5 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
+        {isError && (
+          <>
+            <p className="mt-2 break-words text-sm text-red-600 dark:text-red-400">{installState.message}</p>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={onClose}
+                className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                Close
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </Dialog>
   );
 }

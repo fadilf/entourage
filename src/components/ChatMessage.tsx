@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { memo, useState, useRef, useCallback } from "react";
-import { Check, Copy, MessageSquare } from "lucide-react";
+import { Check, Copy, MessageSquare, Clock } from "lucide-react";
 import { Message, PermissionLevel, ContentBlock, ToolCall } from "@/lib/types";
 import { parseQuickReplies } from "@/lib/quick-replies";
 import ReactMarkdown from "react-markdown";
@@ -182,7 +182,20 @@ type GroupedBlock =
   | { type: "text"; text: string; key: number }
   | { type: "tool_call"; toolCall: ToolCall; key: string }
   | { type: "tool_group"; toolCalls: ToolCall[]; key: string }
-  | { type: "mcp_app"; block: ContentBlock & { type: "mcp_app" }; key: string; index: number };
+  | { type: "mcp_app"; block: ContentBlock & { type: "mcp_app" }; key: string; index: number }
+  | { type: "schedule_wakeup"; block: ContentBlock & { type: "schedule_wakeup" }; key: string };
+
+function ScheduleWakeupNote({ block }: { block: ContentBlock & { type: "schedule_wakeup" } }) {
+  return (
+    <div className="my-1 flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500">
+      <Clock className="h-3 w-3 shrink-0" />
+      <span>
+        Scheduled a wake-up in {block.delaySeconds}s
+        {block.reason ? <> — {block.reason}</> : null}
+      </span>
+    </div>
+  );
+}
 
 function groupConsecutiveToolCalls(blocks: ContentBlock[]): GroupedBlock[] {
   const result: GroupedBlock[] = [];
@@ -206,6 +219,8 @@ function groupConsecutiveToolCalls(blocks: ContentBlock[]): GroupedBlock[] {
       flushTools();
       if (block.type === "mcp_app") {
         result.push({ type: "mcp_app", block: block as ContentBlock & { type: "mcp_app" }, key: `mcp-${block.toolName}-${i}`, index: i });
+      } else if (block.type === "schedule_wakeup") {
+        result.push({ type: "schedule_wakeup", block: block as ContentBlock & { type: "schedule_wakeup" }, key: `wake-${i}` });
       } else {
         result.push({ type: "text", text: (block as ContentBlock & { type: "text" }).text, key: i });
       }
@@ -316,6 +331,8 @@ export default memo(function ChatMessage({
                   toolResult={grouped.block.toolResult}
                   html={grouped.block.html}
                 />
+              ) : grouped.type === "schedule_wakeup" ? (
+                <ScheduleWakeupNote key={grouped.key} block={grouped.block} />
               ) : (
                 <MarkdownBlock key={grouped.key} content={grouped.text} isStreaming={isStreaming} />
               )
@@ -335,6 +352,8 @@ export default memo(function ChatMessage({
                   toolResult={block.toolResult}
                   html={block.html}
                 />
+              ) : block.type === "schedule_wakeup" ? (
+                <ScheduleWakeupNote key={`wake-${i}`} block={block} />
               ) : (
                 <MarkdownBlock key={i} content={block.text} isStreaming={isStreaming} />
               )

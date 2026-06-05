@@ -70,6 +70,16 @@ const MAX_BUFFER_CHUNKS = 100;
 // The next turn cold-starts via --resume, preserving context.
 const PERSISTENT_IDLE_MS = 5 * 60 * 1000;
 
+// ScheduleWakeup: the server-side timer fires this long AFTER the model's
+// requested delay, giving a connected browser tab a chance to "claim" the
+// wakeup and run it live first. With the tab closed, nothing claims and the
+// server fires the continuation headlessly.
+const WAKEUP_GRACE_MS = 4000;
+// Safety backstop: stop arming auto-continuations after this many consecutive
+// chained wakeups with no intervening real user message, so a model can't
+// self-loop forever while the tab is closed.
+const MAX_WAKEUP_CHAIN = 20;
+
 /**
  * Extract a user-friendly error message from raw stderr output.
  * Looks for common error patterns and avoids dumping stack traces.
@@ -98,6 +108,10 @@ class ProcessManager {
   private usedSessions = new Set<string>(); // Track sessions that have been used
   private killedSessions = new Set<string>(); // Track sessions killed intentionally
   private sessionOverrides = new Map<string, string>(); // Override sessionId after rewind
+  // Pending server-side ScheduleWakeup timers, keyed by `${threadId}:${agentId}`.
+  private wakeupTimers = new Map<string, { timer: NodeJS.Timeout; fireAt: number; prompt: string }>();
+  // Consecutive chained-wakeup count per key (reset by a real user message).
+  private wakeupChain = new Map<string, number>();
 
   private key(threadId: string, agentId: string): string {
     return `${threadId}:${agentId}`;
@@ -530,8 +544,89 @@ class ProcessManager {
     entry.idleTimer.unref?.();
   }
 
+  /**
+   * Arm a server-side ScheduleWakeup timer. Fires `WAKEUP_GRACE_MS` after the
+   * requested delay so a connected tab can claim it first (see claimWakeup).
+   * Returns `{ fireAt }` with the epoch-ms deadline, or `{ capped: true }` when
+   * the chained-wakeup backstop was hit (no timer armed). Survives the browser
+   * being closed: the singleton lives in the Next.js server process.
+   */
+  scheduleWakeup(
+    workspaceDir: string,
+    threadId: string,
+    agentId: string,
+    delayMs: number,
+    prompt: string
+  ): { fireAt: number } | { capped: true } {
+    const k = this.key(threadId, agentId);
+    const n = (this.wakeupChain.get(k) ?? 0) + 1;
+    if (n > MAX_WAKEUP_CHAIN) return { capped: true };
+    this.wakeupChain.set(k, n);
+
+    const prev = this.wakeupTimers.get(k);
+    if (prev) clearTimeout(prev.timer);
+
+    const effective = Math.max(1000, delayMs) + WAKEUP_GRACE_MS;
+    const fireAt = Date.now() + effective;
+    const timer = setTimeout(() => {
+      this.wakeupTimers.delete(k);
+      void this.fireWakeup(workspaceDir, threadId, agentId, prompt);
+    }, effective);
+    timer.unref?.();
+    this.wakeupTimers.set(k, { timer, fireAt, prompt });
+    return { fireAt };
+  }
+
+  /** Run a due wakeup headlessly (tab closed). Skips if the agent is already streaming. */
+  private async fireWakeup(workspaceDir: string, threadId: string, agentId: string, prompt: string): Promise<void> {
+    const entry = this.processes.get(this.key(threadId, agentId));
+    if (entry && this.isActive(entry)) return; // A client already started this turn.
+    try {
+      const { runWakeupTurn } = await import("./wakeup-runner");
+      await runWakeupTurn(workspaceDir, threadId, agentId, prompt);
+    } catch (err) {
+      console.error(`Headless wakeup turn failed for ${threadId}:${agentId}:`, err);
+    }
+  }
+
+  /**
+   * A connected client takes over a pending wakeup so it can run the turn live.
+   * Cancels the server's fallback timer and returns true if there was one to
+   * claim; false means the server already fired (client should not double-run).
+   */
+  claimWakeup(threadId: string, agentId: string): boolean {
+    const k = this.key(threadId, agentId);
+    const w = this.wakeupTimers.get(k);
+    if (!w) return false;
+    clearTimeout(w.timer);
+    this.wakeupTimers.delete(k);
+    return true;
+  }
+
+  /**
+   * Cancel a pending wakeup and reset its chain. Used when the user dismisses it,
+   * takes over with a manual message, stops the agent, or claims it to run live.
+   */
+  cancelWakeup(threadId: string, agentId: string): void {
+    const k = this.key(threadId, agentId);
+    const w = this.wakeupTimers.get(k);
+    if (w) { clearTimeout(w.timer); this.wakeupTimers.delete(k); }
+    this.wakeupChain.delete(k);
+  }
+
+  private clearWakeupsForThread(threadId: string): void {
+    const prefix = `${threadId}:`;
+    for (const [k, w] of this.wakeupTimers) {
+      if (k.startsWith(prefix)) { clearTimeout(w.timer); this.wakeupTimers.delete(k); }
+    }
+    for (const k of this.wakeupChain.keys()) {
+      if (k.startsWith(prefix)) this.wakeupChain.delete(k);
+    }
+  }
+
   kill(threadId: string, agentId: string): void {
     const k = this.key(threadId, agentId);
+    this.cancelWakeup(threadId, agentId);
     const entry = this.processes.get(k);
     if (!entry) return;
 
@@ -577,6 +672,7 @@ class ProcessManager {
   }
 
   killByThread(threadId: string): void {
+    this.clearWakeupsForThread(threadId);
     const toKill: string[] = [];
     for (const [key, entry] of this.processes) {
       if (entry.threadId === threadId) {
@@ -610,6 +706,7 @@ class ProcessManager {
   resetSessions(threadId: string, agentIds: string[]): void {
     for (const agentId of agentIds) {
       const k = this.key(threadId, agentId);
+      this.cancelWakeup(threadId, agentId);
       const oldSessionId = this.getSessionId(threadId, agentId);
       this.usedSessions.delete(oldSessionId);
       this.killedSessions.add(oldSessionId);
@@ -618,6 +715,9 @@ class ProcessManager {
   }
 
   killAll(): void {
+    for (const [, w] of this.wakeupTimers) clearTimeout(w.timer);
+    this.wakeupTimers.clear();
+    this.wakeupChain.clear();
     for (const [, entry] of this.processes) {
       entry.killed = true;
       if (entry.idleTimer) { clearTimeout(entry.idleTimer); entry.idleTimer = undefined; }

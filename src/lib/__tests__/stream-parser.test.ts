@@ -44,6 +44,39 @@ describe("createStreamParser", () => {
       expect(events).toEqual([{ type: "tool_result", toolId: "t1", output: "file contents" }]);
     });
 
+    it("emits a schedule_wakeup event for the ScheduleWakeup tool", () => {
+      const events = parse("claude", [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                id: "t1",
+                name: "ScheduleWakeup",
+                input: { delaySeconds: 120, prompt: "Continue the task", reason: "watching CI" },
+              },
+            ],
+          },
+        }),
+      ]);
+      expect(events).toEqual([
+        { type: "schedule_wakeup", delaySeconds: 120, prompt: "Continue the task", reason: "watching CI" },
+      ]);
+    });
+
+    it("clamps ScheduleWakeup delaySeconds and defaults missing fields", () => {
+      const events = parse("claude", [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{ type: "tool_use", id: "t1", name: "ScheduleWakeup", input: { delaySeconds: 5 } }],
+          },
+        }),
+      ]);
+      expect(events).toEqual([{ type: "schedule_wakeup", delaySeconds: 60, prompt: "" }]);
+    });
+
     it("treats non-JSON lines as content for Claude", () => {
       const events = parse("claude", ["plain text output"]);
       expect(events).toEqual([{ type: "content", text: "plain text output" }]);
