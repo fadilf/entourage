@@ -36,6 +36,8 @@ export default function MessageGroup({
   onContextMenu,
   permissionLevel,
   onChangePermissionLevel,
+  onQuickReplySelect,
+  onQuickReplyEdit,
 }: {
   group: MessageGroupData;
   agent?: Agent;
@@ -47,6 +49,8 @@ export default function MessageGroup({
   onContextMenu?: (message: Message, x: number, y: number) => void;
   permissionLevel?: PermissionLevel;
   onChangePermissionLevel?: (level: PermissionLevel) => void;
+  onQuickReplySelect?: (text: string) => void;
+  onQuickReplyEdit?: (text: string) => void;
 }) {
   const firstMessage = group.messages[0];
 
@@ -112,6 +116,8 @@ export default function MessageGroup({
             onContextMenu={onContextMenu}
             permissionLevel={permissionLevel}
             onChangePermissionLevel={onChangePermissionLevel}
+            onQuickReplySelect={onQuickReplySelect}
+            onQuickReplyEdit={onQuickReplyEdit}
           />
         </div>
       </div>
@@ -128,6 +134,8 @@ export default function MessageGroup({
               onContextMenu={onContextMenu}
               permissionLevel={permissionLevel}
               onChangePermissionLevel={onChangePermissionLevel}
+              onQuickReplySelect={onQuickReplySelect}
+              onQuickReplyEdit={onQuickReplyEdit}
             />
           </div>
         </div>

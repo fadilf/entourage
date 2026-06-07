@@ -37,6 +37,8 @@ export default memo(function MessageList({
   onContextMenu,
   permissionLevel,
   onChangePermissionLevel,
+  onQuickReplySelect,
+  onQuickReplyEdit,
 }: {
   messages: Message[];
   agents: Agent[];
@@ -46,6 +48,8 @@ export default memo(function MessageList({
   onContextMenu?: (message: Message, x: number, y: number) => void;
   permissionLevel?: PermissionLevel;
   onChangePermissionLevel?: (level: PermissionLevel) => void;
+  onQuickReplySelect?: (text: string) => void;
+  onQuickReplyEdit?: (text: string) => void;
 }) {
   const groups = groupMessages(messages);
 
@@ -73,6 +77,8 @@ export default memo(function MessageList({
             onContextMenu={onContextMenu}
             permissionLevel={permissionLevel}
             onChangePermissionLevel={onChangePermissionLevel}
+            onQuickReplySelect={onQuickReplySelect}
+            onQuickReplyEdit={onQuickReplyEdit}
           />
         );
       })}

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { memo, useState, useRef, useCallback } from "react";
 import { Check, Copy, MessageSquare, Clock } from "lucide-react";
 import { Message, PermissionLevel, ContentBlock, ToolCall } from "@/lib/types";
-import { parseQuickReplies } from "@/lib/quick-replies";
+import { splitQuickReplies } from "@/lib/quick-replies";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -12,6 +12,7 @@ import { useWsParam } from "@/contexts/WorkspaceContext";
 import { useWorkspaceLayout } from "@/contexts/WorkspaceLayoutContext";
 import ToolCallBlock from "./ToolCallBlock";
 import ToolCallGroup from "./ToolCallGroup";
+import QuickReplies from "./QuickReplies";
 import McpAppBlock from "./McpAppBlock";
 import PermissionDenialBanner from "./PermissionDenialBanner";
 import { useSpeakingMessageId } from "@/lib/tts";
@@ -178,6 +179,45 @@ function MarkdownBlock({ content, isStreaming }: { content: string; isStreaming?
   );
 }
 
+/**
+ * Renders assistant text, splitting out inline <QuickReply> blocks and
+ * rendering each as a button row in place. When quick replies are disabled the
+ * blocks are dropped entirely (never shown as raw XML).
+ */
+function AssistantText({
+  content,
+  isStreaming,
+  quickRepliesEnabled,
+  onQuickReplySelect,
+  onQuickReplyEdit,
+}: {
+  content: string;
+  isStreaming?: boolean;
+  quickRepliesEnabled: boolean;
+  onQuickReplySelect?: (text: string) => void;
+  onQuickReplyEdit?: (text: string) => void;
+}) {
+  const segments = splitQuickReplies(content, { streaming: isStreaming });
+  return (
+    <>
+      {segments.map((seg, i) =>
+        seg.type === "text" ? (
+          <MarkdownBlock key={i} content={seg.text} isStreaming={isStreaming} />
+        ) : quickRepliesEnabled ? (
+          <QuickReplies
+            key={i}
+            suggestions={seg.options}
+            loading={false}
+            onSelect={(t) => onQuickReplySelect?.(t)}
+            onEdit={onQuickReplyEdit ? (t) => onQuickReplyEdit(t) : undefined}
+            className="flex flex-wrap gap-2 my-2"
+          />
+        ) : null
+      )}
+    </>
+  );
+}
+
 type GroupedBlock =
   | { type: "text"; text: string; key: number }
   | { type: "tool_call"; toolCall: ToolCall; key: string }
@@ -236,23 +276,37 @@ export default memo(function ChatMessage({
   onContextMenu,
   permissionLevel,
   onChangePermissionLevel,
+  onQuickReplySelect,
+  onQuickReplyEdit,
 }: {
   message: Message;
   isUser: boolean;
   onContextMenu?: (message: Message, x: number, y: number) => void;
   permissionLevel?: PermissionLevel;
   onChangePermissionLevel?: (level: PermissionLevel) => void;
+  onQuickReplySelect?: (text: string) => void;
+  onQuickReplyEdit?: (text: string) => void;
 }) {
   const wsParam = useWsParam();
-  const { toolCallGroupingEnabled } = useWorkspaceLayout();
+  const { toolCallGroupingEnabled, quickRepliesEnabled } = useWorkspaceLayout();
   const isError = message.status === "error";
   const isStreaming = message.status === "streaming";
-  const sanitizedContent = !isUser ? parseQuickReplies(message.content || "").cleaned : (message.content || "");
-  const sanitizedBlocks = !isUser && message.contentBlocks
-    ? message.contentBlocks.map((block) =>
-        block.type === "text" ? { ...block, text: parseQuickReplies(block.text).cleaned } : block
-      )
-    : message.contentBlocks;
+  // Raw content is passed through untouched; AssistantText splits out inline
+  // <QuickReply> blocks at render time.
+  const sanitizedContent = message.content || "";
+  const sanitizedBlocks = message.contentBlocks;
+  // Legacy messages persisted before inline rendering kept suggestions in a
+  // separate field with the block stripped from content. Show those as a
+  // trailing row, but only when no inline block is present.
+  const hasInlineQuickReply =
+    (message.content || "").includes("<QuickReply>") ||
+    !!message.contentBlocks?.some((b) => b.type === "text" && b.text.includes("<QuickReply>"));
+  const showLegacySuggestions =
+    !isUser &&
+    quickRepliesEnabled &&
+    !isStreaming &&
+    !hasInlineQuickReply &&
+    !!message.suggestions?.length;
 
   // Long-press to open context menu on mobile (touchscreens)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -334,7 +388,14 @@ export default memo(function ChatMessage({
               ) : grouped.type === "schedule_wakeup" ? (
                 <ScheduleWakeupNote key={grouped.key} block={grouped.block} />
               ) : (
-                <MarkdownBlock key={grouped.key} content={grouped.text} isStreaming={isStreaming} />
+                <AssistantText
+                  key={grouped.key}
+                  content={grouped.text}
+                  isStreaming={isStreaming}
+                  quickRepliesEnabled={quickRepliesEnabled}
+                  onQuickReplySelect={onQuickReplySelect}
+                  onQuickReplyEdit={onQuickReplyEdit}
+                />
               )
             )}
           </>
@@ -355,7 +416,14 @@ export default memo(function ChatMessage({
               ) : block.type === "schedule_wakeup" ? (
                 <ScheduleWakeupNote key={`wake-${i}`} block={block} />
               ) : (
-                <MarkdownBlock key={i} content={block.text} isStreaming={isStreaming} />
+                <AssistantText
+                  key={i}
+                  content={block.text}
+                  isStreaming={isStreaming}
+                  quickRepliesEnabled={quickRepliesEnabled}
+                  onQuickReplySelect={onQuickReplySelect}
+                  onQuickReplyEdit={onQuickReplyEdit}
+                />
               )
             )}
           </>
@@ -374,8 +442,25 @@ export default memo(function ChatMessage({
               ))}
             </div>
           ) : null}
-          <MarkdownBlock content={sanitizedContent} isStreaming={isStreaming} />
+          <AssistantText
+            content={sanitizedContent}
+            isStreaming={isStreaming}
+            quickRepliesEnabled={quickRepliesEnabled}
+            onQuickReplySelect={onQuickReplySelect}
+            onQuickReplyEdit={onQuickReplyEdit}
+          />
         </>
+      )}
+
+      {/* Legacy quick replies (persisted before inline rendering) */}
+      {showLegacySuggestions && message.suggestions && (
+        <QuickReplies
+          suggestions={message.suggestions}
+          loading={false}
+          onSelect={(t) => onQuickReplySelect?.(t)}
+          onEdit={onQuickReplyEdit ? (t) => onQuickReplyEdit(t) : undefined}
+          className="flex flex-wrap gap-2 my-2"
+        />
       )}
 
       {/* Image attachments for user messages — rendered below text */}

@@ -7,7 +7,6 @@ import Dialog from "./Dialog";
 import MessageList from "./MessageList";
 import WakeupIndicator from "./WakeupIndicator";
 import MessageInput from "./MessageInput";
-import QuickReplies from "./QuickReplies";
 import ContextMenu from "./ContextMenu";
 import { speak, stop as stopTts, useSpeakingMessageId, stripMarkdownForSpeech, isTtsSupported } from "@/lib/tts";
 
@@ -27,7 +26,6 @@ export default function ThreadDetail({
   onRewind,
   onResendMessage,
   onEditMessage,
-  suggestions,
   onSuggestionSelect,
   onDraftChange,
   permissionLevel,
@@ -58,7 +56,6 @@ export default function ThreadDetail({
   onRewind?: (messageId: string, options?: { keepMessage?: boolean; revertCode?: boolean }) => Promise<void> | void;
   onResendMessage?: (message: Message) => void;
   onEditMessage?: (message: Message) => Promise<boolean>;
-  suggestions?: string[];
   onSuggestionSelect?: (text: string) => void;
   onDraftChange?: (hasText: boolean) => void;
   permissionLevel?: PermissionLevel;
@@ -127,13 +124,11 @@ export default function ThreadDetail({
         threadId: thread.id,
         role: "assistant" as const,
         agentId,
-        content: data.content.replace(/<QuickReply>[\s\S]*$/,  "").trimEnd(),
+        content: data.content,
         timestamp: new Date().toISOString(),
         status: "streaming" as const,
         ...(data.toolCalls?.length ? { toolCalls: data.toolCalls } : {}),
-        ...(data.contentBlocks?.length ? { contentBlocks: data.contentBlocks.map(b =>
-          b.type === "text" ? { ...b, text: b.text.replace(/<QuickReply>[\s\S]*$/, "").trimEnd() } : b
-        ) } : {}),
+        ...(data.contentBlocks?.length ? { contentBlocks: data.contentBlocks } : {}),
         ...(data.isReattach ? { isReattach: true } : {}),
       })
     );
@@ -154,8 +149,6 @@ export default function ThreadDetail({
       </div>
     );
   }
-
-  const hasQuickReplies = (suggestions?.length ?? 0) > 0;
 
   // A follow-up can be queued while streaming when every currently-streaming
   // agent runs a persistent session that accepts queued turns. Both Claude
@@ -399,16 +392,11 @@ export default function ThreadDetail({
           onContextMenu={handleContextMenu}
           permissionLevel={permissionLevel}
           onChangePermissionLevel={onChangePermissionLevel}
+          onQuickReplySelect={(text) => onSuggestionSelect?.(text)}
+          onQuickReplyEdit={(text) => setEditDraft(text)}
         />
       </div>
       <div className="border-t border-zinc-200 dark:border-zinc-700">
-        <QuickReplies
-          suggestions={suggestions ?? []}
-          loading={false}
-          onSelect={(text) => onSuggestionSelect?.(text)}
-          onEdit={(text) => setEditDraft(text)}
-          className={`${isMobile ? "px-4" : "px-6"} pt-2 pb-0.5`}
-        />
         <MessageInput
           key={thread.id}
           threadId={thread.id}
@@ -422,7 +410,7 @@ export default function ThreadDetail({
           isMobile={isMobile}
           onDraftChange={onDraftChange}
           showTopBorder={false}
-          compactTopPadding={hasQuickReplies}
+          compactTopPadding={false}
           workspaceThreads={workspaceThreads}
           editDraft={editDraft}
           onEditDraftConsumed={() => setEditDraft(null)}

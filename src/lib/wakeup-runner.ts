@@ -2,7 +2,7 @@ import { getThread, addMessage, updateMessage, addUnreadAgent } from "./thread-s
 import { loadAgents, loadDefaultCliModels, loadQuickReplies } from "./agent-store";
 import { loadWorkspaces } from "./workspace-store";
 import { buildContextualPrompt, buildFullHistoryPrompt } from "./context";
-import { QUICK_REPLY_INSTRUCTION, parseQuickReplies } from "./quick-replies";
+import { QUICK_REPLY_INSTRUCTION } from "./quick-replies";
 import { stripMentions } from "./mentions";
 import { resolveCliModel, writeMcpConfigFile } from "./config";
 import { loadMcpServers } from "./mcp-store";
@@ -139,24 +139,13 @@ export async function runWakeupTurn(
         if (tc.status === "running") tc.status = status === "error" ? "error" : "complete";
       }
 
-      let finalContent = accumulatedContent;
-      let inlineSuggestions: string[] = [];
-      if (status === "complete") {
-        const parsed = parseQuickReplies(accumulatedContent);
-        finalContent = parsed.cleaned;
-        inlineSuggestions = parsed.suggestions;
-        const last = accumulatedBlocks[accumulatedBlocks.length - 1];
-        if (parsed.cleaned !== accumulatedContent && last && last.type === "text") {
-          last.text = parseQuickReplies(last.text).cleaned;
-        }
-      }
-
+      // Inline <QuickReply> blocks stay in the content; the client splits and
+      // renders them in place.
       updateMessage(workspaceDir, threadId, assistantMsg.id, {
-        content: finalContent || (status === "error" ? "[Wakeup turn failed]" : ""),
+        content: accumulatedContent || (status === "error" ? "[Wakeup turn failed]" : ""),
         status,
         ...(accumulatedToolCalls.length > 0 ? { toolCalls: accumulatedToolCalls } : {}),
         ...(accumulatedBlocks.length > 0 ? { contentBlocks: accumulatedBlocks } : {}),
-        ...(inlineSuggestions.length > 0 ? { suggestions: inlineSuggestions } : {}),
         ...(accumulatedDenials.length > 0 ? { permissionDenials: accumulatedDenials } : {}),
       }).catch(() => {});
 

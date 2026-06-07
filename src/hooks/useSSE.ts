@@ -22,8 +22,7 @@ const MAX_CHAINED_WAKEUPS = 20;
 export function useAgentStream(
   threadId: string | null,
   onStreamComplete?: (threadId: string) => void,
-  workspaceId?: string | null,
-  onInlineSuggestions?: (suggestions: string[]) => void
+  workspaceId?: string | null
 ) {
   // Store streams for ALL threads in a ref so they persist across threadId changes
   const allStreams = useRef<Map<string, Map<string, StreamingMessage>>>(
@@ -45,8 +44,6 @@ export function useAgentStream(
   const [error, setError] = useState<string | null>(null);
   const onCompleteRef = useRef(onStreamComplete);
   onCompleteRef.current = onStreamComplete;
-  const onSuggestionsRef = useRef(onInlineSuggestions);
-  onSuggestionsRef.current = onInlineSuggestions;
   // Ref to streamAgent so auto_dispatch can call it without circular deps
   const streamAgentRef = useRef<((tid: string, agentId: string, prompt: string) => Promise<void>) | undefined>(undefined);
   const threadIdRef = useRef(threadId);
@@ -298,12 +295,6 @@ export function useAgentStream(
           threadStreams.set(agentId, { ...existing, agentId, content: existing?.content ?? "", contentBlocks: blocks });
           scheduleWakeup(tid, agentId, event.delaySeconds, event.prompt, event.reason);
           triggerRender();
-          break;
-        }
-        case "suggestions": {
-          if (tid === threadIdRef.current) {
-            onSuggestionsRef.current?.(event.suggestions);
-          }
           break;
         }
         case "auto_dispatch": {

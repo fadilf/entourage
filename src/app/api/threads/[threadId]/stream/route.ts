@@ -5,7 +5,7 @@ import { createStreamParser, StreamEvent } from "@/lib/stream-parser";
 import { MessageImage, ToolCall, ContentBlock, PermissionDenial, isAgentModel } from "@/lib/types";
 import { loadAgents, loadDefaultCliModels, loadQuickReplies } from "@/lib/agent-store";
 import { buildContextualPrompt, buildFullHistoryPrompt } from "@/lib/context";
-import { QUICK_REPLY_INSTRUCTION, parseQuickReplies } from "@/lib/quick-replies";
+import { QUICK_REPLY_INSTRUCTION } from "@/lib/quick-replies";
 import { stripMentions, parseMentions } from "@/lib/mentions";
 import path from "path";
 import { getUploadsDir, ENTOURAGE_DIR, THREADS_DIR, resolveCliModel, writeMcpConfigFile } from "@/lib/config";
@@ -433,29 +433,13 @@ export async function POST(
               }
             }
 
-            // Parse and strip <QuickReply> tags from content
-            let finalContent = accumulatedContent;
-            let inlineSuggestions: string[] = [];
-            if (status === "complete") {
-              const parsed = parseQuickReplies(accumulatedContent);
-              finalContent = parsed.cleaned;
-              inlineSuggestions = parsed.suggestions;
-              // Also clean the last text block
-              if (parsed.cleaned !== accumulatedContent) {
-                const lastBlock = accumulatedBlocks[accumulatedBlocks.length - 1];
-                if (lastBlock && lastBlock.type === "text") {
-                  const blockParsed = parseQuickReplies(lastBlock.text);
-                  lastBlock.text = blockParsed.cleaned;
-                }
-              }
-            }
-
+            // Inline <QuickReply> blocks stay in the content; the client splits
+            // and renders them in place.
             updateMessage(workspaceDir, threadId, assistantMsg.id, {
-              content: finalContent || (status === "error" ? `[Process exited with code ${code}]` : ""),
+              content: accumulatedContent || (status === "error" ? `[Process exited with code ${code}]` : ""),
               status,
               ...(accumulatedToolCalls.length > 0 ? { toolCalls: accumulatedToolCalls } : {}),
               ...(accumulatedBlocks.length > 0 ? { contentBlocks: accumulatedBlocks } : {}),
-              ...(inlineSuggestions.length > 0 ? { suggestions: inlineSuggestions } : {}),
               ...(accumulatedDenials.length > 0 ? { permissionDenials: accumulatedDenials } : {}),
             }).catch(() => {});
 
@@ -467,10 +451,6 @@ export async function POST(
             }
 
             try {
-              if (inlineSuggestions.length > 0) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "suggestions", suggestions: inlineSuggestions })}\n\n`));
-              }
-
               // TODO: re-enable auto-dispatch after next release
               // Auto-dispatch: if thread has a coordinator and this agent's response @mentions other agents
               // if (status === "complete" && thread.coordinatorId && finalContent) {

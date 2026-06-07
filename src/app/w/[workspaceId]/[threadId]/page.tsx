@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ThreadWithMessages, Message, MessageImage, PermissionLevel } from "@/lib/types";
 import { useFetch } from "@/hooks/useFetch";
@@ -17,7 +17,6 @@ export default function ThreadPage() {
     displayName,
     userIcon,
     userColor,
-    quickRepliesEnabled,
     refetchThreads,
     threads,
     activeWorkspace,
@@ -25,7 +24,6 @@ export default function ThreadPage() {
   } = useWorkspaceLayout();
 
   const streamCompleteThreadId = useRef<string | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   // Fetch thread data
   const threadUrl = wsUrl(`/api/threads/${threadId}`);
@@ -46,13 +44,6 @@ export default function ThreadPage() {
     }
   }, [selectedThread?.title, activeWorkspace?.name]);
 
-  // Suggestions
-  const handleInlineSuggestions = useCallback((inlineSuggestions: string[]) => {
-    if (inlineSuggestions.length > 0) {
-      setSuggestions(inlineSuggestions);
-    }
-  }, []);
-
   const handleStreamComplete = useCallback(
     (completedThreadId: string) => {
       streamCompleteThreadId.current = completedThreadId;
@@ -65,7 +56,7 @@ export default function ThreadPage() {
   );
 
   const { streamingMessages, isStreaming, sendMessage, stopAgent, reattach, autoDispatchPaused, resetAutoDispatch, pendingWakeups, cancelWakeup, continueWakeupNow } =
-    useAgentStream(threadId, handleStreamComplete, workspaceId, handleInlineSuggestions);
+    useAgentStream(threadId, handleStreamComplete, workspaceId);
 
   // Re-attach to streams on mount
   useEffect(() => {
@@ -89,26 +80,6 @@ export default function ThreadPage() {
       refetchThread();
     }
   }, [threadId, refetchThread]);
-
-  // Restore persisted suggestions once when thread first loads
-  const lastRestoredThreadId = useRef<string | null>(null);
-
-  useEffect(() => {
-    setSuggestions([]);
-    lastRestoredThreadId.current = null;
-  }, [threadId]);
-
-  useEffect(() => {
-    if (!selectedThread || lastRestoredThreadId.current === selectedThread.id) return;
-    lastRestoredThreadId.current = selectedThread.id;
-    const lastAssistant = [...selectedThread.messages]
-      .reverse()
-      .find((m) => m.role === "assistant" && m.status === "complete");
-    const persisted = lastAssistant?.suggestions ?? [];
-    if (persisted.length > 0) {
-      setSuggestions(persisted);
-    }
-  }, [selectedThread]);
 
   // Clear unread on mount
   useEffect(() => {
@@ -171,12 +142,6 @@ export default function ThreadPage() {
     [threadId, setSelectedThread, wsUrl]
   );
 
-  const handleDraftChange = useCallback((hasText: boolean) => {
-    if (hasText) {
-      setSuggestions((prev) => (prev.length === 0 ? prev : []));
-    }
-  }, []);
-
   // Send message
   const sendUserMessage = useCallback(
     async (content: string, images?: MessageImage[], attachedThreads?: { id: string; title: string }[]) => {
@@ -218,7 +183,6 @@ export default function ThreadPage() {
 
   const handleSendMessage = useCallback(
     async (content: string, images?: MessageImage[], attachedThreads?: { id: string; title: string }[]) => {
-      setSuggestions([]);
       await sendUserMessage(content, images, attachedThreads);
     },
     [sendUserMessage]
@@ -268,7 +232,6 @@ export default function ThreadPage() {
   const handleResendMessage = useCallback(
     async (message: Message) => {
       if (message.role !== "user") return;
-      setSuggestions([]);
       const rewound = await rewindThread(message.id, false);
       if (!rewound) return;
       await sendUserMessage(message.content, message.images, message.attachedThreads);
@@ -280,7 +243,6 @@ export default function ThreadPage() {
   const handleEditMessage = useCallback(
     async (message: Message): Promise<boolean> => {
       if (message.role !== "user") return false;
-      setSuggestions([]);
       const rewound = await rewindThread(message.id, false);
       return !!rewound;
     },
@@ -307,12 +269,7 @@ export default function ThreadPage() {
       userColor={userColor}
       isMobile={isMobile}
       onBack={isMobile ? () => router.back() : undefined}
-      suggestions={quickRepliesEnabled && !isStreaming ? suggestions : []}
-      onSuggestionSelect={(text: string) => {
-        setSuggestions([]);
-        handleSendMessage(text);
-      }}
-      onDraftChange={handleDraftChange}
+      onSuggestionSelect={(text: string) => handleSendMessage(text)}
       permissionLevel={effectivePermissionLevel}
       onChangePermissionLevel={handleChangePermissionLevel}
       workspaceThreads={threads.length > 0 ? threads : undefined}
