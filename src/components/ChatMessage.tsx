@@ -16,6 +16,8 @@ import QuickReplies from "./QuickReplies";
 import McpAppBlock from "./McpAppBlock";
 import PermissionDenialBanner from "./PermissionDenialBanner";
 import { useSpeakingMessageId } from "@/lib/tts";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 function renderMentions(content: string) {
   const parts = content.split(/(@\w+)/g);
@@ -30,6 +32,24 @@ function renderMentions(content: string) {
     )
   );
 }
+
+const codeBlockStyle: Record<string, React.CSSProperties> = {
+  ...oneDark,
+  'pre[class*="language-"]': {
+    ...(oneDark['pre[class*="language-"]'] as React.CSSProperties),
+    margin: 0,
+    padding: "0 0.75rem 0.625rem",
+    background: "transparent",
+    fontSize: "12px",
+    lineHeight: "1.375",
+  },
+  'code[class*="language-"]': {
+    ...(oneDark['code[class*="language-"]'] as React.CSSProperties),
+    background: "transparent",
+    fontSize: "12px",
+    lineHeight: "1.375",
+  },
+};
 
 function CodeBlock({ language, code }: { language: string; code: string }) {
   const [copied, setCopied] = useState(false);
@@ -64,9 +84,20 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
           )}
         </button>
       </div>
-      <pre className="overflow-x-auto px-3 pb-2.5 text-xs font-mono leading-snug">
-        <code>{code}</code>
-      </pre>
+      {language ? (
+        <SyntaxHighlighter
+          language={language}
+          style={codeBlockStyle}
+          customStyle={{ background: "transparent" }}
+          codeTagProps={{ style: { fontFamily: "inherit" } }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      ) : (
+        <pre className="overflow-x-auto px-3 pb-2.5 text-xs font-mono leading-snug">
+          <code>{code}</code>
+        </pre>
+      )}
     </div>
   );
 }
